@@ -1,0 +1,7 @@
+project_includes = ["**/*"]
+project_excludes = [
+    "**/.[!/.]*",
+    "**/*venv/**/*",
+]
+[errors]
+import-error = false

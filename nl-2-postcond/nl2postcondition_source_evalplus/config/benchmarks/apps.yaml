@@ -1,0 +1,8 @@
+name: apps-verified-100
+location: /data/duncan/expecto/benchmark/apps-verified-100.json
+
+run_all: true
+run_range: false
+
+run_start: ""
+run_end: ""

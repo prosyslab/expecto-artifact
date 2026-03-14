@@ -1,0 +1,30 @@
+[run]
+source = 
+    src
+    utils
+omit =
+    */site-packages/*
+    */dist-packages/*
+    */__pycache__/*
+    */tests/*
+    */.local/*
+    */.venv/*
+    */debug/*
+    */docker/*
+    */logs/*
+    */prompts/*
+    */vis/*
+    */__init__.py
+    src/solvers/*
+    src/tasks/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise ImportError
+    except ImportError
+    raise Exception

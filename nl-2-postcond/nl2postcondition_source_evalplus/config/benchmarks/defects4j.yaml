@@ -1,0 +1,8 @@
+name: defects4j
+location: ../../datasets/defects4j.jsonl
+
+run_all: true
+run_range: false
+
+run_start: ""
+run_end: ""

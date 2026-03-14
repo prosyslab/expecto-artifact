@@ -1,0 +1,5 @@
+defaults:
+  - experiment: generateLLMSamplesSimple
+  - api: openai
+  - benchmarks: evalplus
+
