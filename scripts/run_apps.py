@@ -22,12 +22,14 @@ def run_apps_with_nl2postcond(
     exp_name: str,
     base_dir: str,
     limit: int | None,
+    sample_ids: str | None,
     nl2_variant: str,
 ) -> None:
     run_nl2postcond_for_task(
         task=TASK,
         output_root=Path(base_dir) / exp_name / "nl-2-postcond",
         limit=limit,
+        sample_ids=sample_ids,
         variant=nl2_variant,
     )
 
@@ -42,6 +44,12 @@ def run_apps_with_nl2postcond(
 @click.option("--debug", is_flag=True, help="Run in debug mode")
 @click.option("--exp-name", type=str, default="exp", help="The name of the experiment")
 @click.option("--limit", type=int, default=None, help="The number of problems to run")
+@click.option(
+    "--sample-ids",
+    type=str,
+    default=None,
+    help="Comma-separated problem IDs to run.",
+)
 @click.option("--dev", is_flag=True, help="Run in dev mode")
 @click.option(
     "--n_completions",
@@ -100,6 +108,7 @@ def run(
     exp_name,
     dev,
     limit,
+    sample_ids,
     n_completions,
     max_attempts,
     dsl,
@@ -111,6 +120,9 @@ def run(
     nl2_variant,
 ):
     """Run APPS benchmark with specified solver."""
+    if limit is not None and sample_ids:
+        raise click.ClickException("Use either --limit or --sample-ids, not both.")
+
     if solver == "nl2postcond":
         log_ignored_nl2postcond_options(
             debug=debug,
@@ -127,6 +139,7 @@ def run(
             exp_name=exp_name,
             base_dir=base_dir,
             limit=limit,
+            sample_ids=sample_ids,
             nl2_variant=nl2_variant,
         )
         return
@@ -170,6 +183,8 @@ def run(
         )
     if limit:
         args.extend(["--limit", str(limit)])
+    if sample_ids:
+        args.extend(["--sample-ids", sample_ids])
     if dsl:
         args.append("--dsl")
     if use_test_cases:

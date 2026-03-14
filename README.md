@@ -21,8 +21,6 @@ In the paper, the experiments were conducted with:
 - 512 GB RAM
 - 256 GB storage
 
-For a quick smoke check, the `mini` mode is sufficient on a much smaller machine. For the full artifact, use as many CPU cores and as much memory as possible.
-
 ### Setup with Docker
 
 1. Build the Docker image:
@@ -103,7 +101,7 @@ The main artifact runner supports four modes:
 
 - `full`: run all experiment units needed for `RQ1`-`RQ4`, then generate all figures and tables under `full/figures/`
 - `rq`: run only one research question and generate only that RQ's outputs under `full/figures/rq*/`
-- `mini`: run a reduced trend-preserving sweep and write the reduced results under `mini/`
+- `mini`: run a reduced sample sweep and write the reduced results under `mini/`
 - `target`: run one benchmark-specific experiment unit only and write only its raw run directory
 
 For every successful run, the artifact writes two kinds of outputs:
@@ -315,17 +313,11 @@ What to check:
 - `evaluation.rq4.defects4j.table.pdf` is the compiled table-only PDF for the same comparison
 - The corresponding raw run directories under `full/runs/defects4j/` exist for all three compared systems
 
-### Quick smoke check: `mini`
+### Quick check: `mini`
 Run the reduced sweep:
 
 ```bash
 python3 scripts/run_artifact.py mini
-```
-
-Use a different reduced limit:
-
-```bash
-python3 scripts/run_artifact.py mini --mini-limit 2
 ```
 
 Preview the reduced sweep without executing:
@@ -336,7 +328,10 @@ python3 scripts/run_artifact.py mini --dry-run
 
 What this command does:
 
-- Runs the same experiment families as `full`, but with a reduced per-benchmark problem limit (`--mini-limit`, default `5`)
+- Runs the same experiment families as `full`, but uses fixed benchmark subsets for the EvalPlus-style benchmarks instead of a prefix limit
+- Uses these 20 APPS problem IDs: `15, 57, 23, 76, 83, 39, 101, 3701, 4004, 37, 94, 16, 61, 52, 42, 47, 72, 90, 4005, 71`
+- Uses these 20 HumanEval+ problem IDs: `22, 52, 75, 61, 83, 92, 34, 53, 73, 129, 140, 158, 54, 124, 6, 71, 32, 123, 162, 63`
+- Keeps Defects4J on the existing reduced-limit path with an internal limit of `5`
 - Generates reduced outputs for `RQ1`-`RQ4`
 - Writes everything under `/workspace/data/experiment/artifact/mini`
 
@@ -349,7 +344,7 @@ Where the results are stored:
 How this maps to the paper:
 
 - `mini` is not meant to reproduce the exact paper numbers
-- It is the short AE smoke-test path for checking that the full `§4` evaluation pipeline is wired correctly
+- It is the short AE check path for checking that the full `§4` evaluation pipeline is wired correctly
 
 What to check:
 
@@ -405,7 +400,7 @@ The artifact supports the following paper claims:
 The artifact does not directly support the following claims as standalone push-button outputs:
 
 - The qualitative example figures `Fig. 7`, `Fig. 11`, and `Fig. 12` are discussed in the paper, but `run_artifact.py` does not regenerate them as dedicated outputs. The artifact focuses on the quantitative evaluation claims in `§4.2`-`§4.5`.
-- `mini` is a reduced smoke-test profile and is not intended to reproduce the exact final paper numbers.
+- `mini` is a reduced check profile and is not intended to reproduce the exact final paper numbers.
 
 ---
 ## 5. Experimental setting from the paper

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from inspect_ai import Epochs, Task, task
-from inspect_ai.dataset import Sample, json_dataset
+from inspect_ai.dataset import MemoryDataset, Sample, json_dataset
 
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
@@ -35,6 +35,42 @@ INPUT = textwrap.dedent("""
         """).strip()
 
 
+def parse_sample_ids(sample_ids: str | None) -> list[str]:
+    if not sample_ids:
+        return []
+
+    ordered_ids: list[str] = []
+    seen: set[str] = set()
+    for raw_id in sample_ids.split(","):
+        sample_id = raw_id.strip()
+        if not sample_id or sample_id in seen:
+            continue
+        ordered_ids.append(sample_id)
+        seen.add(sample_id)
+    return ordered_ids
+
+
+def filter_dataset_by_sample_ids(dataset, sample_ids: str | None):
+    ordered_ids = parse_sample_ids(sample_ids)
+    if not ordered_ids:
+        return dataset
+
+    sample_by_id = {str(sample.id): sample for sample in dataset}
+    missing_ids = [
+        sample_id for sample_id in ordered_ids if sample_id not in sample_by_id
+    ]
+    if missing_ids:
+        logger.warning("Unknown APPS sample IDs requested: %s", missing_ids)
+
+    filtered_samples = [
+        sample_by_id[sample_id]
+        for sample_id in ordered_ids
+        if sample_id in sample_by_id
+    ]
+    logger.info("Filtered APPS dataset to %d sample(s)", len(filtered_samples))
+    return MemoryDataset(filtered_samples)
+
+
 @task(name="apps")
 def apps(
     solver: str = "monolithic",
@@ -45,6 +81,7 @@ def apps(
     use_test_cases: bool = True,
     use_memo: bool = True,
     check_unsat: bool = True,
+    sample_ids: str | None = None,
     *args,
     **kwargs,
 ) -> Task:
@@ -65,6 +102,7 @@ def apps(
         json_file=os.path.join(dataset_path, f"apps.json"),
         sample_fields=lambda record: record_to_sample(record),
     )
+    dataset = filter_dataset_by_sample_ids(dataset, sample_ids)
 
     logger.info(f"Dataset size: {len(dataset)}")
 

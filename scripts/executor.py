@@ -91,6 +91,12 @@ def allocate_experiment_dir(base_dir: str, exp_name: str) -> Path:
     help="The maximum number of attempts to use",
 )
 @click.option("--limit", type=int, default=None, help="The limit to use")
+@click.option(
+    "--sample-ids",
+    type=str,
+    default=None,
+    help="Comma-separated sample IDs to run.",
+)
 @click.option("--base_dir", type=str, default=None, help="The base directory to use")
 @click.option(
     "--dsl",
@@ -138,6 +144,7 @@ def main(
     n_completions: int,
     max_attempts: int,
     limit: Optional[int],
+    sample_ids: Optional[str],
     base_dir: Optional[str],
     dsl: bool,
     threshold: float,
@@ -161,6 +168,7 @@ def main(
         n_completions: {n_completions}
         max_attempts: {max_attempts}
         threshold: {threshold}
+        sample_ids: {sample_ids}
         use_test_cases: {use_test_cases}
         use_memo: {use_memo}
         check_unsat: {check_unsat}
@@ -213,6 +221,8 @@ def main(
         limit = 1
     if limit is not None:
         task_args["limit"] = limit
+    if sample_ids:
+        task_args["sample_ids"] = sample_ids
     kwargs = {}
     if "gpt-5" not in model:
         kwargs["temperature"] = temperature

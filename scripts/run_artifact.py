@@ -30,6 +30,53 @@ NL2_EVALPLUS_RUNNER = PROJECT_ROOT / "scripts" / "run_nl2postcond.py"
 DEFECTS4J_EXPECTO_RUNNER = PROJECT_ROOT / "scripts" / "run_defects4j.py"
 DEFECTS4J_NL2_RUNNER = PROJECT_ROOT / "scripts" / "run_defects4j_nl2postcond.py"
 FIGURE_GENERATOR = PROJECT_ROOT / "analyzer" / "figure_generator.py"
+MINI_EVALPLUS_SAMPLE_IDS = {
+    "apps": (
+        "15",
+        "16",
+        "23",
+        "37",
+        "39",
+        "42",
+        "47",
+        "52",
+        "57",
+        "61",
+        "71",
+        "72",
+        "76",
+        "83",
+        "90",
+        "94",
+        "101",
+        "3701",
+        "4004",
+        "4005",
+    ),
+    "humaneval_plus": (
+        "6",
+        "22",
+        "32",
+        "34",
+        "52",
+        "53",
+        "54",
+        "61",
+        "63",
+        "71",
+        "73",
+        "75",
+        "83",
+        "92",
+        "123",
+        "124",
+        "129",
+        "140",
+        "158",
+        "162",
+    ),
+}
+MINI_DEFECTS4J_LIMIT = 5
 
 
 @dataclass(frozen=True)
@@ -143,11 +190,18 @@ def _dedupe_units(units: Iterable[ExperimentUnit]) -> list[ExperimentUnit]:
     return list(ordered.values())
 
 
+def _serialize_sample_ids(sample_ids: Sequence[str] | None) -> str | None:
+    if not sample_ids:
+        return None
+    return ",".join(sample_ids)
+
+
 def _build_expecto_evalplus_command(
     benchmark: str,
     variant_name: str,
     run_dir: Path,
     limit: int | None,
+    sample_ids: Sequence[str] | None = None,
 ) -> tuple[str, ...]:
     variant = EXPECTO_VARIANTS[variant_name]
     script_path = EVALPLUS_RUNNERS[benchmark]
@@ -173,7 +227,10 @@ def _build_expecto_evalplus_command(
         args.append("--use_memo")
     if not variant.check_unsat:
         args.append("--no_check_unsat")
-    if limit is not None:
+    serialized_sample_ids = _serialize_sample_ids(sample_ids)
+    if serialized_sample_ids is not None:
+        args.extend(["--sample-ids", serialized_sample_ids])
+    elif limit is not None:
         args.extend(["--limit", str(limit)])
     return tuple(args)
 
@@ -183,6 +240,7 @@ def _build_nl2_evalplus_command(
     variant_name: str,
     run_dir: Path,
     limit: int | None,
+    sample_ids: Sequence[str] | None = None,
 ) -> tuple[str, ...]:
     nl2_variant = "base" if variant_name == "nl2_base" else "simple"
     args = [
@@ -195,7 +253,10 @@ def _build_nl2_evalplus_command(
         "--variant",
         nl2_variant,
     ]
-    if limit is not None:
+    serialized_sample_ids = _serialize_sample_ids(sample_ids)
+    if serialized_sample_ids is not None:
+        args.extend(["--sample-ids", serialized_sample_ids])
+    elif limit is not None:
         args.extend(["--limit", str(limit)])
     return tuple(args)
 
@@ -248,6 +309,7 @@ def _make_evalplus_expecto_unit(
     variant_name: str,
     rq: str,
     limit: int | None,
+    sample_ids: Sequence[str] | None = None,
 ) -> ExperimentUnit:
     run_dir = _run_dir(layout, benchmark, variant_name)
     return ExperimentUnit(
@@ -257,7 +319,7 @@ def _make_evalplus_expecto_unit(
         variant=variant_name,
         run_dir=run_dir,
         command=_build_expecto_evalplus_command(
-            benchmark, variant_name, run_dir, limit
+            benchmark, variant_name, run_dir, limit, sample_ids
         ),
         marker_kind="expecto",
         cleanup_smt=True,
@@ -270,6 +332,7 @@ def _make_evalplus_nl2_unit(
     variant_name: str,
     rq: str,
     limit: int | None,
+    sample_ids: Sequence[str] | None = None,
 ) -> ExperimentUnit:
     run_dir = _run_dir(layout, benchmark, variant_name)
     return ExperimentUnit(
@@ -278,7 +341,9 @@ def _make_evalplus_nl2_unit(
         benchmark=benchmark,
         variant=variant_name,
         run_dir=run_dir,
-        command=_build_nl2_evalplus_command(benchmark, variant_name, run_dir, limit),
+        command=_build_nl2_evalplus_command(
+            benchmark, variant_name, run_dir, limit, sample_ids
+        ),
         marker_kind="nl2_evalplus",
     )
 
@@ -324,6 +389,8 @@ def build_rq_units(
     rq: str,
     *,
     limit: int | None = None,
+    evalplus_sample_ids: dict[str, Sequence[str]] | None = None,
+    defects4j_limit: int | None = None,
 ) -> list[ExperimentUnit]:
     if rq not in RQ_CHOICES:
         raise click.ClickException(f"Unsupported RQ: {rq}")
@@ -331,43 +398,71 @@ def build_rq_units(
     units: list[ExperimentUnit] = []
     if rq == "rq1":
         for benchmark in EVALPLUS_BENCHMARKS:
+            sample_ids = (
+                evalplus_sample_ids.get(benchmark) if evalplus_sample_ids else None
+            )
             units.extend(
                 [
-                    _make_evalplus_expecto_unit(layout, benchmark, "ts", rq, limit),
-                    _make_evalplus_nl2_unit(layout, benchmark, "nl2_base", rq, limit),
-                    _make_evalplus_nl2_unit(layout, benchmark, "nl2_simple", rq, limit),
+                    _make_evalplus_expecto_unit(
+                        layout, benchmark, "ts", rq, limit, sample_ids
+                    ),
+                    _make_evalplus_nl2_unit(
+                        layout, benchmark, "nl2_base", rq, limit, sample_ids
+                    ),
+                    _make_evalplus_nl2_unit(
+                        layout, benchmark, "nl2_simple", rq, limit, sample_ids
+                    ),
                 ]
             )
     elif rq == "rq2":
         for benchmark in EVALPLUS_BENCHMARKS:
+            sample_ids = (
+                evalplus_sample_ids.get(benchmark) if evalplus_sample_ids else None
+            )
             units.extend(
                 [
-                    _make_evalplus_expecto_unit(layout, benchmark, "mono", rq, limit),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "topdown", rq, limit
+                        layout, benchmark, "mono", rq, limit, sample_ids
                     ),
-                    _make_evalplus_expecto_unit(layout, benchmark, "ts", rq, limit),
+                    _make_evalplus_expecto_unit(
+                        layout, benchmark, "topdown", rq, limit, sample_ids
+                    ),
+                    _make_evalplus_expecto_unit(
+                        layout, benchmark, "ts", rq, limit, sample_ids
+                    ),
                 ]
             )
     elif rq == "rq3":
         for benchmark in EVALPLUS_BENCHMARKS:
+            sample_ids = (
+                evalplus_sample_ids.get(benchmark) if evalplus_sample_ids else None
+            )
             units.extend(
                 [
-                    _make_evalplus_expecto_unit(layout, benchmark, "ts", rq, limit),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "without_tc", rq, limit
+                        layout, benchmark, "ts", rq, limit, sample_ids
                     ),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "without_smt", rq, limit
+                        layout, benchmark, "without_tc", rq, limit, sample_ids
+                    ),
+                    _make_evalplus_expecto_unit(
+                        layout, benchmark, "without_smt", rq, limit, sample_ids
                     ),
                 ]
             )
     elif rq == "rq4":
+        effective_defects4j_limit = (
+            defects4j_limit if defects4j_limit is not None else limit
+        )
         units.extend(
             [
-                _make_defects4j_expecto_unit(layout, rq, limit),
-                _make_defects4j_nl2_unit(layout, "nl2_base", rq, limit),
-                _make_defects4j_nl2_unit(layout, "nl2_simple", rq, limit),
+                _make_defects4j_expecto_unit(layout, rq, effective_defects4j_limit),
+                _make_defects4j_nl2_unit(
+                    layout, "nl2_base", rq, effective_defects4j_limit
+                ),
+                _make_defects4j_nl2_unit(
+                    layout, "nl2_simple", rq, effective_defects4j_limit
+                ),
             ]
         )
     return _dedupe_units(units)
@@ -663,6 +758,23 @@ def _run_profile_by_rq(
         generate_figures_for_rq(layout, rq, force=force, dry_run=dry_run)
 
 
+def _run_mini_profile_by_rq(
+    layout: ArtifactLayout,
+    *,
+    force: bool,
+    dry_run: bool,
+) -> None:
+    for rq in RQ_CHOICES:
+        units = build_rq_units(
+            layout,
+            rq,
+            evalplus_sample_ids=MINI_EVALPLUS_SAMPLE_IDS,
+            defects4j_limit=MINI_DEFECTS4J_LIMIT,
+        )
+        execute_units(units, force=force, dry_run=dry_run)
+        generate_figures_for_rq(layout, rq, force=force, dry_run=dry_run)
+
+
 @click.group()
 def cli() -> None:
     """Reviewer-facing artifact runner."""
@@ -729,26 +841,18 @@ def rq(
     default=DEFAULT_OUTPUT_ROOT,
     show_default=True,
 )
-@click.option(
-    "--mini-limit",
-    type=click.IntRange(min=1),
-    default=5,
-    show_default=True,
-    help="Problem limit used for mini mode.",
-)
 @click.option("--force", is_flag=True, help="Rerun completed experiment units.")
 @click.option("--dry-run", is_flag=True, help="Print commands without executing them.")
 def mini(
     output_root: Path,
-    mini_limit: int,
     force: bool,
     dry_run: bool,
 ) -> None:
-    """Run a faster trend-preserving mini profile."""
+    """Run a faster fixed-sample mini profile."""
 
     layout = _layout(output_root, MINI_PROFILE_NAME)
     _print_summary(layout)
-    _run_profile_by_rq(layout, force=force, dry_run=dry_run, limit=mini_limit)
+    _run_mini_profile_by_rq(layout, force=force, dry_run=dry_run)
 
 
 @cli.command()

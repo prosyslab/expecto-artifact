@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -69,12 +70,86 @@ def select_nl2postcond_experiments(variant: str) -> list[dict[str, str]]:
     ]
 
 
+def parse_sample_ids(sample_ids: str | None) -> list[str]:
+    if not sample_ids:
+        return []
+
+    ordered_ids: list[str] = []
+    seen: set[str] = set()
+    for raw_id in sample_ids.split(","):
+        sample_id = raw_id.strip()
+        if not sample_id or sample_id in seen:
+            continue
+        ordered_ids.append(sample_id)
+        seen.add(sample_id)
+    return ordered_ids
+
+
+def build_apps_subset_dataset(output_root: Path, sample_ids: list[str]) -> Path:
+    source_dataset = cast(Path, BENCHMARKS[BCH_APPS]["dataset"])
+    with source_dataset.open("r", encoding="utf-8") as handle:
+        apps_records = json.load(handle)
+
+    apps_by_id = {str(record["problem_id"]): record for record in apps_records}
+    missing_ids = [
+        sample_id for sample_id in sample_ids if sample_id not in apps_by_id
+    ]
+    if missing_ids:
+        raise click.ClickException(
+            f"Unknown APPS sample IDs requested: {', '.join(missing_ids)}"
+        )
+
+    subset_records = [apps_by_id[sample_id] for sample_id in sample_ids]
+    subset_dir = output_root / "_datasets"
+    subset_dir.mkdir(parents=True, exist_ok=True)
+    subset_path = subset_dir / "apps_subset.json"
+    subset_path.write_text(json.dumps(subset_records, indent=2) + "\n", encoding="utf-8")
+    return subset_path
+
+
+def prepare_benchmark_config(
+    benchmark_name: str,
+    output_root: Path,
+    sample_ids: list[str] | None = None,
+) -> dict[str, object]:
+    benchmark = dict(get_benchmark_config(benchmark_name))
+    benchmark["extra_overrides"] = list(cast(list[str], benchmark["extra_overrides"]))
+
+    if not sample_ids:
+        return benchmark
+
+    if benchmark["hydra_name"] == "apps":
+        subset_path = build_apps_subset_dataset(output_root, sample_ids)
+        benchmark["dataset"] = subset_path
+        benchmark["extra_overrides"] = [f"benchmarks.location={subset_path}"]
+
+    return benchmark
+
+
 def get_benchmark_overrides(
     benchmark: dict[str, object],
     limit: int | None = None,
+    sample_ids: list[str] | None = None,
     test_mode: bool = False,
 ) -> list[str]:
     overrides = list(cast(list[str], benchmark["extra_overrides"]))
+    if sample_ids:
+        if benchmark["hydra_name"] == "evalplus":
+            try:
+                run_only = ",".join(str(int(sample_id)) for sample_id in sample_ids)
+            except ValueError as exc:
+                raise click.ClickException(
+                    "HumanEval+ sample IDs must be integers."
+                ) from exc
+            overrides.extend(
+                [
+                    "benchmarks.run_all=false",
+                    "benchmarks.run_range=false",
+                    f"benchmarks.run_only=[{run_only}]",
+                ]
+            )
+        return overrides
+
     effective_limit = 1 if test_mode else limit
     if effective_limit is None or effective_limit < 1:
         return overrides
@@ -196,13 +271,16 @@ def run_benchmark_experiment(
     output_root: Path,
     env: dict[str, str],
     limit: int | None = None,
+    sample_ids: list[str] | None = None,
     workers: int | None = None,
     variant: str = "all",
 ) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
     python_bin = sys.executable
     worker_count = workers if workers is not None else get_default_worker_count()
-    benchmark_overrides = get_benchmark_overrides(benchmark, limit=limit)
+    benchmark_overrides = get_benchmark_overrides(
+        benchmark, limit=limit, sample_ids=sample_ids
+    )
 
     for experiment in select_nl2postcond_experiments(variant):
         generation_root = output_root / "llm_gen_outputs" / experiment["name"]
@@ -252,16 +330,20 @@ def run_nl2postcond_for_task(
     task: str,
     output_root: Path,
     limit: int | None = None,
+    sample_ids: str | None = None,
     workers: int | None = None,
     variant: str = "all",
 ) -> None:
     env = load_env()
-    benchmark = get_benchmark_config(task)
+    resolved_output_root = output_root.resolve()
+    parsed_sample_ids = parse_sample_ids(sample_ids)
+    benchmark = prepare_benchmark_config(task, resolved_output_root, parsed_sample_ids)
     run_benchmark_experiment(
         benchmark=benchmark,
-        output_root=output_root.resolve(),
+        output_root=resolved_output_root,
         env=env,
         limit=limit,
+        sample_ids=parsed_sample_ids,
         workers=workers,
         variant=variant,
     )
@@ -314,6 +396,12 @@ def run_full_experiment(
     help="Limit the number of problems for benchmark-specific runs or mini sweeps.",
 )
 @click.option(
+    "--sample-ids",
+    type=str,
+    default=None,
+    help="Comma-separated benchmark problem IDs to run.",
+)
+@click.option(
     "--benchmark",
     type=click.Choice(sorted(BENCHMARKS.keys())),
     default=None,
@@ -337,6 +425,7 @@ def main(
     test: bool,
     workers: int | None,
     limit: int | None,
+    sample_ids: str | None,
     benchmark: str | None,
     output_root: Path | None,
     variant: str,
@@ -345,6 +434,8 @@ def main(
     if workers is None:
         workers = get_default_worker_count()
     if benchmark is not None:
+        if limit is not None and sample_ids:
+            raise click.UsageError("Use either --limit or --sample-ids, not both.")
         effective_limit = 1 if test else limit
         target_output_root = output_root
         if target_output_root is None:
@@ -354,6 +445,7 @@ def main(
             task=benchmark,
             output_root=target_output_root.resolve(),
             limit=effective_limit,
+            sample_ids=sample_ids,
             workers=workers,
             variant=variant,
         )
@@ -361,6 +453,8 @@ def main(
 
     if output_root is not None:
         raise click.UsageError("--output-root requires --benchmark")
+    if sample_ids is not None:
+        raise click.UsageError("--sample-ids requires --benchmark")
     if variant != "all":
         raise click.UsageError("--variant requires --benchmark")
 
