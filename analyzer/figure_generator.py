@@ -841,8 +841,8 @@ def get_tex_table(inputs: list[AggregatedResult], caption: str, label: str) -> s
     # Header row
     exp_headers = " & ".join(
         [
-            name.replace("Expecto", "\\tool{}")
-            .replace("NL2Postcond", "\\nltopostcond{}")
+            name.replace("Expecto", "\\textsc{Expecto}")
+            .replace("NL2Postcond", "\\textsc{NL2Postcond}")
             .replace("(", "(\\textbf{")
             .replace(")", "})")
             for name in exp_names
@@ -1870,13 +1870,13 @@ def draw_rq3_fig(json_path: str, output_path: str):
         if without_smt_path is not None and len(results) > 2:
             without_smt_data = results[2]
 
-        testcase_results = [parse_expecto_data(without_tc_data, benchmark, "without_tc")]
+        testcase_results = [parse_expecto_data(without_tc_data, benchmark, "Without TC")]
         if without_smt_data is not None:
             has_no_unsat_ablation = True
             testcase_results.append(
-                parse_expecto_data(without_smt_data, benchmark, "without_smt")
+                parse_expecto_data(without_smt_data, benchmark, "Without SMT")
             )
-        testcase_results.append(parse_expecto_data(ts_data, benchmark, "ts"))
+        testcase_results.append(parse_expecto_data(ts_data, benchmark, "With TC"))
         testcase_ablation_datas.extend(testcase_results)
         testcase_by_benchmark[benchmark].extend(testcase_results)
 
@@ -1894,14 +1894,14 @@ def draw_rq3_fig(json_path: str, output_path: str):
 
     testcase_pdf_path = output_dir / "evaluation.rq3.testcase.pdf"
     testcase_colors: dict[str, str] = {
-        "without_smt": COLOR_WRONG,
-        "without_tc": COLOR_COMPLETE_ONLY,
-        "ts": COLOR_SOUND_AND_COMPLETE,
+        "Without SMT": COLOR_WRONG,
+        "Without TC": COLOR_COMPLETE_ONLY,
+        "TreeSearch": COLOR_SOUND_AND_COMPLETE,
     }
     testcase_exp_order: list[str] = []
     if has_no_unsat_ablation:
-        testcase_exp_order.append("without_smt")
-    testcase_exp_order.extend(["without_tc", "ts"])
+        testcase_exp_order.append("Without SMT")
+    testcase_exp_order.extend(["Without TC", "TreeSearch"])
     draw_ablation_subplots(
         testcase_by_benchmark,
         testcase_pdf_path,
