@@ -37,7 +37,7 @@ docker run -it \
 
 ```bash
 cat > .env <<'EOF'
-OPENAI_API_KEY=YOUR_KEY_HERE
+OPENAI_API_KEY=sk-YOUR_KEY_HERE
 EOF
 ```
 
@@ -52,6 +52,40 @@ tar -xzf datasets.tar.gz
 ```
 
 After extraction, the repository should contain the `datasets/` directory with the benchmark files used by the artifact.
+
+4. Run the smoke test once to confirm that the setup is complete:
+
+```bash
+python3 scripts/test.py
+```
+
+Expected output:
+
+```text
+[PASS] .env file: /workspace/expecto-artifact/.env
+[PASS] OPENAI_API_KEY: OPENAI_API_KEY is defined in .env and starts with 'sk-'
+[PASS] datasets directory: /workspace/expecto-artifact/datasets
+[PASS] dataset file: datasets/apps.json
+[PASS] dataset file: datasets/human_eval_plus.json
+[PASS] dataset file: datasets/defects4j.jsonl
+Running RQ1 smoke test:
+/usr/bin/python3 /workspace/expecto-artifact/scripts/run_artifact.py rq --rq rq1 --limit 1 --output-root /workspace/data/experiment/artifact/test-smoke --force
+...
+[PASS] RQ1 execution: run_artifact.py completed successfully
+[PASS] Expecto markers: .../full/runs/apps/ts/evaluation_result/manifest.json
+[PASS] NL2Postcond marker: .../full/runs/apps/nl2_base/.../aggregated_result.json
+[PASS] RQ1 figure output: .../full/figures/rq1/evaluation.rq1.table.pdf
+
+Summary:
+[PASS] .env file
+[PASS] OPENAI_API_KEY
+[PASS] datasets directory
+[PASS] dataset files
+[PASS] RQ1 execution
+[PASS] Expecto markers
+[PASS] NL2Postcond markers
+[PASS] RQ1 figure outputs
+```
 
 ---
 ## 2. Directory structure
