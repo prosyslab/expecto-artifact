@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 from textwrap import indent
+from pathlib import Path
 from typing import List, Optional
 
 import click
@@ -16,6 +17,11 @@ from models import (
 from tqdm.asyncio import tqdm as atqdm
 
 from dataset_paths import get_evalplus_dataset_file
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(PROJECT_ROOT))
+
+from validation_sampling import sample_io_pairs_payload, VALIDATION_SAMPLING_MODES
 
 PPX_SAMPLE_JSONL = "preprocessed_samples.jsonl"
 EVAL_TIMEOUT_SECONDS = 30
@@ -206,20 +212,75 @@ def get_total(io_pairs) -> int:
         return len(json.loads(io_pairs)["inputs"])
 
 
+def resolve_benchmark_name(dataset_path: str) -> str:
+    dataset_name = Path(dataset_path).name.lower()
+    if "human" in dataset_name or "eval" in dataset_name:
+        return "humaneval_plus"
+    return "apps"
+
+
+def sample_problem_io_pairs(
+    problem: dict,
+    *,
+    benchmark: str,
+    problem_id: str,
+    validation_sampling_mode: str,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int,
+) -> tuple[str | dict | None, str | dict | None]:
+    return (
+        sample_io_pairs_payload(
+            problem.get("input_output"),
+            benchmark=benchmark,
+            sample_id=problem_id,
+            phase="positive",
+            mode=validation_sampling_mode,
+            cap=validation_positive_cap,
+            base_seed=validation_sampling_seed,
+        ),
+        sample_io_pairs_payload(
+            problem.get("mutated_input_output"),
+            benchmark=benchmark,
+            sample_id=problem_id,
+            phase="negative",
+            mode=validation_sampling_mode,
+            cap=validation_negative_cap,
+            base_seed=validation_sampling_seed,
+        ),
+    )
+
+
 async def evaluate_one_assertion(
-    data: dict, evalplus_data: dict, target_directory: str
+    data: dict,
+    evalplus_data: dict,
+    target_directory: str,
+    benchmark: str,
+    validation_sampling_mode: str,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int,
 ) -> EvaluationResult:
     assertion = data["postcondition_alone"]
     task_id = data["task_id"]
     response_num = data.get("response_num", 0)
     problem_idx = data["task_id"].split("/")[-1]
     problem = evalplus_data[problem_idx]
+    positive_io_pairs, negative_io_pairs = sample_problem_io_pairs(
+        problem,
+        benchmark=benchmark,
+        problem_id=problem_idx,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
+    )
 
     # Check completeness
     eval_code = get_eval_code(
-        assertion, problem["signature"], problem["input_output"], problem["parser"]
+        assertion, problem["signature"], positive_io_pairs, problem["parser"]
     )
-    complete_total = get_total(problem["input_output"])
+    complete_total = get_total(positive_io_pairs)
     if complete_total == 0:
         complete_total = 1
     complete_stdout_log_path = get_log_path(
@@ -244,10 +305,10 @@ async def evaluate_one_assertion(
     eval_code = get_eval_code(
         assertion,
         problem["signature"],
-        problem["mutated_input_output"],
+        negative_io_pairs,
         problem["parser"],
     )
-    sound_total = get_total(problem["mutated_input_output"])
+    sound_total = get_total(negative_io_pairs)
     if sound_total == 0:
         sound_total = 1
     soundness_stdout_log_path = get_log_path(
@@ -293,9 +354,23 @@ async def evaluate_one_assertion_with_semaphore(
     evalplus_data: dict,
     target_directory: str,
     semaphore: asyncio.Semaphore,
+    benchmark: str,
+    validation_sampling_mode: str,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int,
 ) -> EvaluationResult:
     async with semaphore:
-        return await evaluate_one_assertion(data, evalplus_data, target_directory)
+        return await evaluate_one_assertion(
+            data,
+            evalplus_data,
+            target_directory,
+            benchmark,
+            validation_sampling_mode,
+            validation_positive_cap,
+            validation_negative_cap,
+            validation_sampling_seed,
+        )
 
 
 def aggregate_results(
@@ -329,14 +404,29 @@ def aggregate_results(
 
 
 async def evaluate_target_directory(
-    target_directory: str, dataset: str, worker_count: int
+    target_directory: str,
+    dataset: str,
+    worker_count: int,
+    validation_sampling_mode: str,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int,
 ) -> List[EvaluationResult]:
     data = read_target_directory(target_directory)
     evalplus_data = load_dataset(dataset)
+    benchmark = resolve_benchmark_name(dataset)
     semaphore = asyncio.Semaphore(worker_count)
     tasks = [
         evaluate_one_assertion_with_semaphore(
-            d, evalplus_data, target_directory, semaphore
+            d,
+            evalplus_data,
+            target_directory,
+            semaphore,
+            benchmark,
+            validation_sampling_mode,
+            validation_positive_cap,
+            validation_negative_cap,
+            validation_sampling_seed,
         )
         for d in data
     ]
@@ -358,13 +448,54 @@ async def evaluate_target_directory(
     default=None,
     help="Maximum number of concurrent assertion evaluations.",
 )
+@click.option(
+    "--validation-sampling-mode",
+    type=click.Choice(VALIDATION_SAMPLING_MODES),
+    default="all",
+    show_default=True,
+    help="Validation test sampling mode.",
+)
+@click.option(
+    "--validation-positive-cap",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum number of positive validation test cases.",
+)
+@click.option(
+    "--validation-negative-cap",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum number of negative validation test cases.",
+)
+@click.option(
+    "--validation-sampling-seed",
+    type=int,
+    default=42,
+    show_default=True,
+    help="Base seed for deterministic validation sampling.",
+)
 def main(
-    target_directory: str, dataset: str, exp_name: str, workers: Optional[int]
+    target_directory: str,
+    dataset: str,
+    exp_name: str,
+    workers: Optional[int],
+    validation_sampling_mode: str,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int,
 ):
     worker_count = workers or get_worker_count()
     print(f"Running evaluation with {worker_count} workers")
     results = asyncio.run(
-        evaluate_target_directory(target_directory, dataset, worker_count)
+        evaluate_target_directory(
+            target_directory,
+            dataset,
+            worker_count,
+            validation_sampling_mode,
+            validation_positive_cap,
+            validation_negative_cap,
+            validation_sampling_seed,
+        )
     )
     with open(os.path.join(target_directory, "evaluation_results.json"), "w") as f:
         json.dump([result.model_dump() for result in results], f, indent=4)

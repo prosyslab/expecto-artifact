@@ -12,7 +12,9 @@ from inspect_ai import Epochs, Task, task
 from inspect_ai.dataset import Dataset, MemoryDataset, Sample
 
 project_root = Path(__file__).parent.parent.parent
+repo_root = project_root.parent
 sys.path.append(str(project_root))
+sys.path.append(str(repo_root))
 
 from src.evaluation.sandbox import initialize
 from src.prompts.prompt import defects4j_prompt
@@ -23,6 +25,7 @@ logger = getLogger(__name__)
 from pydantic import BaseModel
 
 import src.solvers as S
+from .validation_sampling import sample_mapping_for_validation
 
 META_FIELDS = {"file_path", "id", "method_signature", "phase", "_type", "type_name"}
 METHOD_ID_SANITIZER = re.compile(r"[^0-9A-Za-z]+")
@@ -64,8 +67,8 @@ class DumpData(BaseModel):
 
 
 class MethodDumpData(BaseModel):
-    corrects: dict[str, dict[str, dict]]  # id -> phase -> dump
-    incorrects: dict[str, dict[str, dict]]  # id -> phase -> dump
+    corrects: dict[str, dict[str, dict]]
+    incorrects: dict[str, dict[str, dict]]
     method_info: MethodInfo
 
     def to_dict(self):
@@ -129,20 +132,40 @@ def _build_method_sample(
     method_index: int,
     include_method_code: bool,
     ids_count: dict[str, int],
+    validation_sampling_mode: str,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int,
 ) -> Sample:
     method_dump = bug_data.method_dumps[method_index]
-    method_metadata = Defects4jMethodSample(
-        project=bug_data.project,
-        bug_id=bug_data.bug_id,
-        method_info=method_dump.method_info,
-        corrects=method_dump.corrects,
-        incorrects=method_dump.incorrects,
-    )
     sample_id = build_method_sample_id(
         bug_data.project,
         bug_data.bug_id,
         method_dump.method_info,
         ids_count,
+    )
+    method_metadata = Defects4jMethodSample(
+        project=bug_data.project,
+        bug_id=bug_data.bug_id,
+        method_info=method_dump.method_info,
+        corrects=sample_mapping_for_validation(
+            method_dump.corrects,
+            benchmark="defects4j",
+            sample_id=sample_id,
+            phase="positive",
+            mode=validation_sampling_mode,
+            cap=validation_positive_cap,
+            base_seed=validation_sampling_seed,
+        ),
+        incorrects=sample_mapping_for_validation(
+            method_dump.incorrects,
+            benchmark="defects4j",
+            sample_id=sample_id,
+            phase="negative",
+            mode=validation_sampling_mode,
+            cap=validation_negative_cap,
+            base_seed=validation_sampling_seed,
+        ),
     )
     return Sample(
         input=build_defects4j_method_prompt(
@@ -157,6 +180,10 @@ def record_to_sample(
     bug_data: dict[str, Any],
     include_method_code: bool,
     method_index: int = 0,
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
 ) -> Sample:
     """Convert one bug record into a single method-level Sample."""
     validated_bug_data = BugData.model_validate(bug_data)
@@ -170,12 +197,21 @@ def record_to_sample(
             current_index,
             include_method_code,
             ids_count,
+            validation_sampling_mode,
+            validation_positive_cap,
+            validation_negative_cap,
+            validation_sampling_seed,
         )
     return sample
 
 
 def record_to_samples(
-    bug_data: dict[str, Any], include_method_code: bool
+    bug_data: dict[str, Any],
+    include_method_code: bool,
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
 ) -> list[Sample]:
     """Convert one bug record into method-level Samples."""
     validated_bug_data = BugData.model_validate(bug_data)
@@ -186,6 +222,10 @@ def record_to_samples(
             method_index,
             include_method_code,
             ids_count,
+            validation_sampling_mode,
+            validation_positive_cap,
+            validation_negative_cap,
+            validation_sampling_seed,
         )
         for method_index in range(len(validated_bug_data.method_dumps))
     ]
@@ -322,6 +362,10 @@ def defects4j(
     check_unsat: bool = True,
     include_method_code: bool = True,
     limit: int | None = None,
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
     *args,
     **kwargs,
 ) -> Task:
@@ -336,7 +380,14 @@ def defects4j(
     )
 
     random.seed(42)
-    dataset = load_defects4j_dataset(include_method_code, limit=limit)
+    dataset = load_defects4j_dataset(
+        include_method_code,
+        limit=limit,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
+    )
 
     logger.info(f"Dataset size: {len(dataset)}")
 
@@ -355,6 +406,10 @@ def defects4j(
 def load_defects4j_dataset(
     include_method_code: bool,
     limit: int | None = None,
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
 ) -> Dataset:
     """Load Defects4J samples, preferring the streaming JSONL artifact."""
 
@@ -363,6 +418,10 @@ def load_defects4j_dataset(
         record,
         include_method_code,
         method_index=method_index,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
     )
     if dataset_file.suffix == ".jsonl":
         return Defects4jJsonlDataset(
@@ -375,6 +434,10 @@ def load_defects4j_dataset(
         dataset_file,
         include_method_code=include_method_code,
         limit=limit,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
     )
 
 
@@ -383,6 +446,10 @@ def load_legacy_defects4j_dataset(
     *,
     include_method_code: bool,
     limit: int | None,
+    validation_sampling_mode: str,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int,
 ) -> Dataset:
     """Fallback loader for the legacy JSON array artifact."""
 
@@ -393,12 +460,30 @@ def load_legacy_defects4j_dataset(
                 remaining = limit - len(samples)
                 if remaining <= 0:
                     break
-                samples.extend(record_to_samples(bug_data, include_method_code)[:remaining])
+                samples.extend(
+                    record_to_samples(
+                        bug_data,
+                        include_method_code,
+                        validation_sampling_mode=validation_sampling_mode,
+                        validation_positive_cap=validation_positive_cap,
+                        validation_negative_cap=validation_negative_cap,
+                        validation_sampling_seed=validation_sampling_seed,
+                    )[:remaining]
+                )
     else:
         with json_file.open("r", encoding="utf-8") as file:
             data = json.load(file)
         for bug_data in data:
-            samples.extend(record_to_samples(bug_data, include_method_code))
+            samples.extend(
+                record_to_samples(
+                    bug_data,
+                    include_method_code,
+                    validation_sampling_mode=validation_sampling_mode,
+                    validation_positive_cap=validation_positive_cap,
+                    validation_negative_cap=validation_negative_cap,
+                    validation_sampling_seed=validation_sampling_seed,
+                )
+            )
 
     return MemoryDataset(
         samples=samples,

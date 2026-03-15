@@ -10,13 +10,16 @@ from inspect_ai import Epochs, Task, task
 from inspect_ai.dataset import MemoryDataset, Sample, json_dataset
 
 project_root = Path(__file__).parent.parent.parent
+repo_root = project_root.parent
 sys.path.append(str(project_root))
+sys.path.append(str(repo_root))
 
 logger = getLogger(__name__)
 
 import src.solvers as S
 from src.evaluation.sandbox import initialize
 from src.tasks.dataset_paths import get_dataset_path
+from .validation_sampling import sample_sequence_for_validation
 
 HUMAN_EVAL_PLUS_VERIFY_TIMEOUT = 60 * 60 * 3  # 3 Hours
 
@@ -68,6 +71,10 @@ def humaneval_plus(
     use_memo: bool = True,
     check_unsat: bool = True,
     sample_ids: str | None = None,
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
     *args,
     **kwargs,
 ) -> Task:
@@ -87,7 +94,13 @@ def humaneval_plus(
     random.seed(42)
     dataset = json_dataset(
         json_file=os.path.join(dataset_path, "human_eval_plus.json"),
-        sample_fields=lambda record: record_to_sample(record),
+        sample_fields=lambda record: record_to_sample(
+            record,
+            validation_sampling_mode=validation_sampling_mode,
+            validation_positive_cap=validation_positive_cap,
+            validation_negative_cap=validation_negative_cap,
+            validation_sampling_seed=validation_sampling_seed,
+        ),
     )
     dataset = filter_dataset_by_sample_ids(dataset, sample_ids)
 
@@ -103,44 +116,67 @@ def humaneval_plus(
     )
 
 
-def record_to_sample(record: dict[str, Any]) -> Sample:
-    soundness_test_list: list[tuple[str, str]] = []
-    completeness_test_list: list[tuple[str, str]] = []
+def record_to_sample(
+    record: dict[str, Any],
+    *,
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
+) -> Sample:
+    full_positive_test_list: list[tuple[str, str]] = []
+    full_negative_test_list: list[tuple[str, str]] = []
     if record["input_output"]:
         input_output = json.loads(record["input_output"])
-        inputs = input_output.get("inputs", [])
-        outputs = input_output.get("outputs", [])
-
-        # Pair each input with its corresponding output
-        soundness_test_list = list(zip(inputs, outputs))
+        full_positive_test_list = list(
+            zip(input_output.get("inputs", []), input_output.get("outputs", []))
+        )
 
     if record["mutated_input_output"]:
         mutated_input_output = json.loads(record["mutated_input_output"])
-        mutated_inputs = mutated_input_output.get("inputs", [])
-        mutated_outputs = mutated_input_output.get("outputs", [])
-        completeness_test_list = list(zip(mutated_inputs, mutated_outputs))
+        full_negative_test_list = list(
+            zip(
+                mutated_input_output.get("inputs", []),
+                mutated_input_output.get("outputs", []),
+            )
+        )
 
-    # Create a limited version for display in the prompt
+    positive_test_list = sample_sequence_for_validation(
+        full_positive_test_list,
+        benchmark="humaneval_plus",
+        sample_id=str(record["problem_id"]),
+        phase="positive",
+        mode=validation_sampling_mode,
+        cap=validation_positive_cap,
+        base_seed=validation_sampling_seed,
+    )
+    negative_test_list = sample_sequence_for_validation(
+        full_negative_test_list,
+        benchmark="humaneval_plus",
+        sample_id=str(record["problem_id"]),
+        phase="negative",
+        mode=validation_sampling_mode,
+        cap=validation_negative_cap,
+        base_seed=validation_sampling_seed,
+    )
+
     prompt_test_list: list[tuple[str, str]] = []
-    prompt_test_string = ""
-    # Pick up to 3 test cases at random, not sequentially
-    if soundness_test_list:
+    if full_positive_test_list:
         selected_tests = random.sample(
-            soundness_test_list, min(3, len(soundness_test_list))
+            full_positive_test_list, min(3, len(full_positive_test_list))
         )
         for input_str, output_str in selected_tests:
             test_case_str = f"assert solution({repr(input_str)}) == {repr(output_str)}"
             if len(test_case_str) <= 1000:
                 prompt_test_list.append((input_str, output_str))
-                prompt_test_string += test_case_str + "\n"
 
     return Sample(
         input=record["prompt"],
         id=record["problem_id"],
         metadata={
             "input": record["prompt"],
-            "test_list": soundness_test_list,  # Full test list
-            "mutated_test_list": completeness_test_list,
+            "test_list": positive_test_list,
+            "mutated_test_list": negative_test_list,
             "prompt_test_list": prompt_test_list,
             "problem_id": record["problem_id"],
             "difficulty": record["difficulty"],

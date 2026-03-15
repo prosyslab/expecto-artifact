@@ -82,19 +82,15 @@ def collect_score(
             collected[CORRECT] += 1
             collected = cast(dict[ScoreLabel, int], collected)
 
-    if collected[CORRECT] == 0 and collected[INCORRECT] == 0:  # I = 0 C = 0 TO = *
+    if collected[CORRECT] == 0 and collected[INCORRECT] == 0:
         result = TIMEOUT
-    elif (
-        collected[CORRECT] >= collected[INCORRECT] and relaxed
-    ):  # I > C in relaxed mode
+    elif collected[CORRECT] >= collected[INCORRECT] and relaxed:
         result = CORRECT
-    elif (
-        collected[CORRECT] < collected[INCORRECT] and relaxed
-    ):  # I <= C in relaxed mode
+    elif collected[CORRECT] < collected[INCORRECT] and relaxed:
         result = INCORRECT
-    elif collected[INCORRECT] > 0:  # I > 0 in strict mode
+    elif collected[INCORRECT] > 0:
         result = INCORRECT
-    else:  # I = 0 C > 0 TO > 0
+    else:
         result = CORRECT
 
     return result, collected

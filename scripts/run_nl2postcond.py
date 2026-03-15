@@ -50,7 +50,12 @@ BENCHMARKS = {
         "extra_overrides": [f"benchmarks.location={DATASETS_ROOT / 'apps.json'}"],
     },
 }
-
+VALIDATION_SAMPLING_ALL = "all"
+VALIDATION_SAMPLING_DETERMINISTIC_CAP = "deterministic_cap"
+VALIDATION_SAMPLING_MODES = (
+    VALIDATION_SAMPLING_ALL,
+    VALIDATION_SAMPLING_DETERMINISTIC_CAP,
+)
 
 def get_benchmark_config(benchmark_name: str) -> dict[str, object]:
     benchmark_key = BENCHMARK_ALIASES.get(benchmark_name.lower())
@@ -274,6 +279,10 @@ def run_benchmark_experiment(
     sample_ids: list[str] | None = None,
     workers: int | None = None,
     variant: str = "all",
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
 ) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
     python_bin = sys.executable
@@ -322,7 +331,15 @@ def run_benchmark_experiment(
             experiment["name"],
             "--workers",
             str(worker_count),
+            "--validation-sampling-mode",
+            validation_sampling_mode,
+            "--validation-sampling-seed",
+            str(validation_sampling_seed),
         ]
+        if validation_positive_cap is not None:
+            evaluation_args.extend(["--validation-positive-cap", str(validation_positive_cap)])
+        if validation_negative_cap is not None:
+            evaluation_args.extend(["--validation-negative-cap", str(validation_negative_cap)])
         run_command(evaluation_args, env)
 
 
@@ -333,6 +350,10 @@ def run_nl2postcond_for_task(
     sample_ids: str | None = None,
     workers: int | None = None,
     variant: str = "all",
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
 ) -> None:
     env = load_env()
     resolved_output_root = output_root.resolve()
@@ -346,6 +367,10 @@ def run_nl2postcond_for_task(
         sample_ids=parsed_sample_ids,
         workers=workers,
         variant=variant,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
     )
 
 
@@ -356,6 +381,10 @@ def run_full_experiment(
     workers: int | None,
     limit: int | None = None,
     variant: str = "all",
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
 ) -> None:
     effective_limit = 1 if test_mode else limit
     for benchmark in BENCHMARKS.values():
@@ -367,6 +396,10 @@ def run_full_experiment(
             limit=effective_limit,
             workers=workers,
             variant=variant,
+            validation_sampling_mode=validation_sampling_mode,
+            validation_positive_cap=validation_positive_cap,
+            validation_negative_cap=validation_negative_cap,
+            validation_sampling_seed=validation_sampling_seed,
         )
 
 
@@ -420,6 +453,32 @@ def run_full_experiment(
     show_default=True,
     help="Which NL2Postcond variant to run.",
 )
+@click.option(
+    "--validation-sampling-mode",
+    type=click.Choice(VALIDATION_SAMPLING_MODES),
+    default="all",
+    show_default=True,
+    help="Validation test sampling mode for EvalPlus evaluation.",
+)
+@click.option(
+    "--validation-positive-cap",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum number of positive validation test cases.",
+)
+@click.option(
+    "--validation-negative-cap",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Maximum number of negative validation test cases.",
+)
+@click.option(
+    "--validation-sampling-seed",
+    type=int,
+    default=42,
+    show_default=True,
+    help="Base seed for deterministic validation sampling.",
+)
 def main(
     save_dir: Path,
     test: bool,
@@ -429,6 +488,10 @@ def main(
     benchmark: str | None,
     output_root: Path | None,
     variant: str,
+    validation_sampling_mode: str,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int,
 ) -> None:
     save_dir.mkdir(parents=True, exist_ok=True)
     if workers is None:
@@ -448,6 +511,10 @@ def main(
             sample_ids=sample_ids,
             workers=workers,
             variant=variant,
+            validation_sampling_mode=validation_sampling_mode,
+            validation_positive_cap=validation_positive_cap,
+            validation_negative_cap=validation_negative_cap,
+            validation_sampling_seed=validation_sampling_seed,
         )
         return
 
@@ -466,6 +533,10 @@ def main(
         workers,
         limit=limit,
         variant=variant,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
     )
 
 

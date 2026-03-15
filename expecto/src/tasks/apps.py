@@ -11,16 +11,17 @@ from inspect_ai import Epochs, Task, task
 from inspect_ai.dataset import MemoryDataset, Sample, json_dataset
 
 project_root = Path(__file__).parent.parent.parent
+repo_root = project_root.parent
 sys.path.append(str(project_root))
+sys.path.append(str(repo_root))
 
-from src.evaluation.sandbox import (
-    initialize,
-)
+from src.evaluation.sandbox import initialize
 
 logger = getLogger(__name__)
 
 import src.solvers as S
 from src.tasks.dataset_paths import get_dataset_path
+from .validation_sampling import sample_sequence_for_validation
 
 APPS_VERIFY_TIMEOUT = 60 * 60 * 3  # 3 Hours
 
@@ -82,6 +83,10 @@ def apps(
     use_memo: bool = True,
     check_unsat: bool = True,
     sample_ids: str | None = None,
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
     *args,
     **kwargs,
 ) -> Task:
@@ -99,8 +104,14 @@ def apps(
 
     random.seed(42)
     dataset = json_dataset(
-        json_file=os.path.join(dataset_path, f"apps.json"),
-        sample_fields=lambda record: record_to_sample(record),
+        json_file=os.path.join(dataset_path, "apps.json"),
+        sample_fields=lambda record: record_to_sample(
+            record,
+            validation_sampling_mode=validation_sampling_mode,
+            validation_positive_cap=validation_positive_cap,
+            validation_negative_cap=validation_negative_cap,
+            validation_sampling_seed=validation_sampling_seed,
+        ),
     )
     dataset = filter_dataset_by_sample_ids(dataset, sample_ids)
 
@@ -118,27 +129,53 @@ def apps(
     )
 
 
-def record_to_sample(record: dict[str, Any]) -> Sample:
-    soundness_test_list: list[tuple[str, str]] = []
-    completeness_test_list: list[tuple[str, str]] = []
+def record_to_sample(
+    record: dict[str, Any],
+    *,
+    validation_sampling_mode: str = "all",
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int = 42,
+) -> Sample:
+    full_positive_test_list: list[tuple[str, str]] = []
+    full_negative_test_list: list[tuple[str, str]] = []
     if record["input_output"]:
         input_output = json.loads(record["input_output"])
-        inputs = input_output.get("inputs", [])
-        outputs = input_output.get("outputs", [])
-
-        # Pair each input with its corresponding output
-        soundness_test_list = list(zip(inputs, outputs))
+        full_positive_test_list = list(
+            zip(input_output.get("inputs", []), input_output.get("outputs", []))
+        )
 
     if record["mutated_input_output"]:
         mutated_input_output = json.loads(record["mutated_input_output"])
-        mutated_inputs = mutated_input_output.get("inputs", [])
-        mutated_outputs = mutated_input_output.get("outputs", [])
-        completeness_test_list = list(zip(mutated_inputs, mutated_outputs))
+        full_negative_test_list = list(
+            zip(
+                mutated_input_output.get("inputs", []),
+                mutated_input_output.get("outputs", []),
+            )
+        )
 
-    # Create a limited version for display in the prompt
+    positive_test_list = sample_sequence_for_validation(
+        full_positive_test_list,
+        benchmark="apps",
+        sample_id=str(record["problem_id"]),
+        phase="positive",
+        mode=validation_sampling_mode,
+        cap=validation_positive_cap,
+        base_seed=validation_sampling_seed,
+    )
+    negative_test_list = sample_sequence_for_validation(
+        full_negative_test_list,
+        benchmark="apps",
+        sample_id=str(record["problem_id"]),
+        phase="negative",
+        mode=validation_sampling_mode,
+        cap=validation_negative_cap,
+        base_seed=validation_sampling_seed,
+    )
+
     prompt_test_list: list[tuple[str, str]] = []
     prompt_test_string = ""
-    for input_str, output_str in soundness_test_list:
+    for input_str, output_str in full_positive_test_list:
         test_case_str = f"assert solution({repr(input_str)}) == {repr(output_str)}"
         if len(test_case_str) <= 1000:
             prompt_test_list.append((input_str, output_str))
@@ -146,15 +183,15 @@ def record_to_sample(record: dict[str, Any]) -> Sample:
         if len(prompt_test_list) >= 3:
             break
 
-    input = INPUT.format(question=record["prompt"], test_list_str=prompt_test_string)
+    input_text = INPUT.format(question=record["prompt"], test_list_str=prompt_test_string)
 
     return Sample(
-        input=input,
+        input=input_text,
         id=record["problem_id"],
         metadata={
-            "input": input,
-            "test_list": soundness_test_list,  # Full test list
-            "mutated_test_list": completeness_test_list,
+            "input": input_text,
+            "test_list": positive_test_list,
+            "mutated_test_list": negative_test_list,
             "prompt_test_list": prompt_test_list,
             "problem_id": record["problem_id"],
             "difficulty": record["difficulty"],

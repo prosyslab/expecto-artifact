@@ -60,76 +60,23 @@ def allocate_experiment_dir(base_dir: str, exp_name: str) -> Path:
 @click.option("--temperature", type=float, default=0.0, help="The temperature to use")
 @click.option("--epochs", type=int, default=1, help="The number of epochs to run")
 @click.option("--exp_name", type=str, default="exp", help="The name of the experiment")
-@click.option(
-    "--max_connections",
-    type=int,
-    default=64,
-    help="The maximum number of connections to use",
-)
-@click.option(
-    "--max_subprocesses",
-    type=int,
-    default=64,
-    help="The maximum number of subprocesses to use",
-)
-@click.option(
-    "--max_sandboxes",
-    type=int,
-    default=64,
-    help="The maximum number of sandboxes to use",
-)
-@click.option(
-    "--n_completions",
-    type=int,
-    default=1,
-    help="The number of completions to use",
-)
-@click.option(
-    "--max_attempts",
-    type=int,
-    default=5,
-    help="The maximum number of attempts to use",
-)
+@click.option("--max_connections", type=int, default=64, help="The maximum number of connections to use")
+@click.option("--max_subprocesses", type=int, default=64, help="The maximum number of subprocesses to use")
+@click.option("--max_sandboxes", type=int, default=64, help="The maximum number of sandboxes to use")
+@click.option("--n_completions", type=int, default=1, help="The number of completions to use")
+@click.option("--max_attempts", type=int, default=5, help="The maximum number of attempts to use")
 @click.option("--limit", type=int, default=None, help="The limit to use")
-@click.option(
-    "--sample-ids",
-    type=str,
-    default=None,
-    help="Comma-separated sample IDs to run.",
-)
+@click.option("--sample-ids", type=str, default=None, help="Comma-separated sample IDs to run.")
 @click.option("--base_dir", type=str, default=None, help="The base directory to use")
-@click.option(
-    "--dsl",
-    type=bool,
-    default=False,
-    help="Whether to use DSL",
-    is_flag=True,
-)
-@click.option(
-    "--threshold",
-    type=float,
-    default=0.5,
-    help="The threshold to use for the merger",
-)
-@click.option(
-    "--use_test_cases",
-    type=bool,
-    default=False,
-    help="Whether to use test cases",
-    is_flag=True,
-)
-@click.option(
-    "--use_memo",
-    type=bool,
-    default=False,
-    help="Whether to use memo",
-    is_flag=True,
-)
-@click.option(
-    "--check_unsat/--no_check_unsat",
-    default=True,
-    help="Whether to check unsatisfiability when no test cases are available",
-)
+@click.option("--dsl", type=bool, default=False, help="Whether to use DSL", is_flag=True)
+@click.option("--threshold", type=float, default=0.5, help="The threshold to use for the merger")
+@click.option("--use_test_cases", type=bool, default=False, help="Whether to use test cases", is_flag=True)
+@click.option("--use_memo", type=bool, default=False, help="Whether to use memo", is_flag=True)
+@click.option("--check_unsat/--no_check_unsat", default=True, help="Whether to check unsatisfiability when no test cases are available")
+@click.option("--validation-sampling-mode", type=click.Choice(["all", "deterministic_cap"]), default="all", show_default=True, help="Validation test sampling mode.")
+@click.option("--validation-positive-cap", type=click.IntRange(min=1), default=None, help="Maximum number of positive validation test cases.")
+@click.option("--validation-negative-cap", type=click.IntRange(min=1), default=None, help="Maximum number of negative validation test cases.")
+@click.option("--validation-sampling-seed", type=int, default=42, show_default=True, help="Base seed for deterministic validation sampling.")
 def main(
     task: str,
     solver: str,
@@ -151,6 +98,10 @@ def main(
     use_test_cases: bool,
     use_memo: bool,
     check_unsat: bool,
+    validation_sampling_mode: str,
+    validation_positive_cap: Optional[int],
+    validation_negative_cap: Optional[int],
+    validation_sampling_seed: int,
 ):
     base_dir = base_dir or DEFAULT_BASE_DIRS.get(task, "inspect_logs")
     log_dir = allocate_experiment_dir(base_dir, exp_name)
@@ -158,7 +109,8 @@ def main(
     os.makedirs(log_path, exist_ok=True)
     logger = get_logger(log_path)
     logger.info(
-        textwrap.dedent(f"""
+        textwrap.dedent(
+            f"""
         task: {task}
         solver: {solver}
         epochs: {epochs}
@@ -172,7 +124,12 @@ def main(
         use_test_cases: {use_test_cases}
         use_memo: {use_memo}
         check_unsat: {check_unsat}
-        """)
+        validation_sampling_mode: {validation_sampling_mode}
+        validation_positive_cap: {validation_positive_cap}
+        validation_negative_cap: {validation_negative_cap}
+        validation_sampling_seed: {validation_sampling_seed}
+        """
+        )
     )
     cwd = Path(__file__).parent.parent
     logger.info(f"Current working directory: {cwd}")
@@ -215,6 +172,10 @@ def main(
         "use_test_cases": use_test_cases,
         "use_memo": use_memo,
         "check_unsat": check_unsat,
+        "validation_sampling_mode": validation_sampling_mode,
+        "validation_positive_cap": validation_positive_cap,
+        "validation_negative_cap": validation_negative_cap,
+        "validation_sampling_seed": validation_sampling_seed,
     }
     begin_time = time()
     if debug:
@@ -227,7 +188,6 @@ def main(
     if "gpt-5" not in model:
         kwargs["temperature"] = temperature
 
-    # Running
     while retry_count < 3:
         if retry_count == 0:
             result = eval_inspect_ai(
@@ -281,17 +241,6 @@ def main(
         str(Path(result_path).parent / "results.json"),
     ]
     execute(args, logger)
-
-    args = [
-        "python3",
-        "analyzer/performance_analyzer.py",
-        log_path,
-    ]
-    execute(args, logger)
-
-    args = ["python3", "analyzer/reader.py", log_path]
-    execute(args, logger)
-
 
 if __name__ == "__main__":
     main()  # type: ignore

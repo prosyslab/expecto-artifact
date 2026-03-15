@@ -77,6 +77,9 @@ MINI_EVALPLUS_SAMPLE_IDS = {
     ),
 }
 MINI_DEFECTS4J_LIMIT = 5
+MINI_VALIDATION_SAMPLING_MODE = "deterministic_cap"
+MINI_VALIDATION_LIMIT = 30
+MINI_VALIDATION_SAMPLING_SEED = 42
 
 
 @dataclass(frozen=True)
@@ -196,14 +199,87 @@ def _serialize_sample_ids(sample_ids: Sequence[str] | None) -> str | None:
     return ",".join(sample_ids)
 
 
+def _resolve_expecto_variant(
+    variant_name: str,
+    *,
+    n_completions_override: int | None = None,
+    max_attempts_override: int | None = None,
+) -> ExpectoVariant:
+    variant = EXPECTO_VARIANTS[variant_name]
+    if n_completions_override is None and max_attempts_override is None:
+        return variant
+    return ExpectoVariant(
+        solver=variant.solver,
+        n_completions=(
+            variant.n_completions
+            if n_completions_override is None
+            else n_completions_override
+        ),
+        max_attempts=(
+            variant.max_attempts
+            if max_attempts_override is None
+            else max_attempts_override
+        ),
+        use_test_cases=variant.use_test_cases,
+        use_memo=variant.use_memo,
+        check_unsat=variant.check_unsat,
+        dsl=variant.dsl,
+    )
+
+
+def _validation_sampling_kwargs(validation_limit: int | None) -> dict[str, int | str | None]:
+    if validation_limit is None:
+        return {
+            "validation_sampling_mode": None,
+            "validation_positive_cap": None,
+            "validation_negative_cap": None,
+            "validation_sampling_seed": None,
+        }
+    return {
+        "validation_sampling_mode": MINI_VALIDATION_SAMPLING_MODE,
+        "validation_positive_cap": validation_limit,
+        "validation_negative_cap": validation_limit,
+        "validation_sampling_seed": MINI_VALIDATION_SAMPLING_SEED,
+    }
+
+
+def _append_validation_sampling_args(
+    args: list[str],
+    *,
+    validation_sampling_mode: str | None,
+    validation_positive_cap: int | None,
+    validation_negative_cap: int | None,
+    validation_sampling_seed: int | None,
+) -> None:
+    if validation_sampling_mode is None:
+        return
+    args.extend(["--validation-sampling-mode", validation_sampling_mode])
+    if validation_positive_cap is not None:
+        args.extend(["--validation-positive-cap", str(validation_positive_cap)])
+    if validation_negative_cap is not None:
+        args.extend(["--validation-negative-cap", str(validation_negative_cap)])
+    if validation_sampling_seed is not None:
+        args.extend(["--validation-sampling-seed", str(validation_sampling_seed)])
+
+
 def _build_expecto_evalplus_command(
     benchmark: str,
     variant_name: str,
     run_dir: Path,
     limit: int | None,
     sample_ids: Sequence[str] | None = None,
+    validation_sampling_mode: str | None = None,
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int | None = None,
+    expecto_n_completions: int | None = None,
+    expecto_max_attempts: int | None = None,
 ) -> tuple[str, ...]:
-    variant = EXPECTO_VARIANTS[variant_name]
+    variant = _resolve_expecto_variant(
+        variant_name,
+        n_completions_override=expecto_n_completions,
+        max_attempts_override=expecto_max_attempts,
+    )
     script_path = EVALPLUS_RUNNERS[benchmark]
     args: list[str] = [
         PYTHON_BIN,
@@ -232,6 +308,13 @@ def _build_expecto_evalplus_command(
         args.extend(["--sample-ids", serialized_sample_ids])
     elif limit is not None:
         args.extend(["--limit", str(limit)])
+    _append_validation_sampling_args(
+        args,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
+    )
     return tuple(args)
 
 
@@ -241,6 +324,10 @@ def _build_nl2_evalplus_command(
     run_dir: Path,
     limit: int | None,
     sample_ids: Sequence[str] | None = None,
+    validation_sampling_mode: str | None = None,
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int | None = None,
 ) -> tuple[str, ...]:
     nl2_variant = "base" if variant_name == "nl2_base" else "simple"
     args = [
@@ -258,12 +345,25 @@ def _build_nl2_evalplus_command(
         args.extend(["--sample-ids", serialized_sample_ids])
     elif limit is not None:
         args.extend(["--limit", str(limit)])
+    _append_validation_sampling_args(
+        args,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
+    )
     return tuple(args)
 
 
 def _build_defects4j_expecto_command(
     run_dir: Path,
     limit: int | None,
+    validation_sampling_mode: str | None = None,
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int | None = None,
+    expecto_n_completions: int | None = None,
+    expecto_max_attempts: int | None = None,
 ) -> tuple[str, ...]:
     args = [
         PYTHON_BIN,
@@ -273,14 +373,21 @@ def _build_defects4j_expecto_command(
         "--base_dir",
         _click_path(run_dir.parent),
         "--n_completions",
-        "3",
+        str(3 if expecto_n_completions is None else expecto_n_completions),
         "--max_attempts",
-        "3",
+        str(3 if expecto_max_attempts is None else expecto_max_attempts),
         "--dsl",
         "--use_test_cases",
     ]
     if limit is not None:
         args.extend(["--limit", str(limit)])
+    _append_validation_sampling_args(
+        args,
+        validation_sampling_mode=validation_sampling_mode,
+        validation_positive_cap=validation_positive_cap,
+        validation_negative_cap=validation_negative_cap,
+        validation_sampling_seed=validation_sampling_seed,
+    )
     return tuple(args)
 
 
@@ -310,6 +417,12 @@ def _make_evalplus_expecto_unit(
     rq: str,
     limit: int | None,
     sample_ids: Sequence[str] | None = None,
+    validation_sampling_mode: str | None = None,
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int | None = None,
+    expecto_n_completions: int | None = None,
+    expecto_max_attempts: int | None = None,
 ) -> ExperimentUnit:
     run_dir = _run_dir(layout, benchmark, variant_name)
     return ExperimentUnit(
@@ -319,7 +432,17 @@ def _make_evalplus_expecto_unit(
         variant=variant_name,
         run_dir=run_dir,
         command=_build_expecto_evalplus_command(
-            benchmark, variant_name, run_dir, limit, sample_ids
+            benchmark,
+            variant_name,
+            run_dir,
+            limit,
+            sample_ids,
+            validation_sampling_mode,
+            validation_positive_cap,
+            validation_negative_cap,
+            validation_sampling_seed,
+            expecto_n_completions,
+            expecto_max_attempts,
         ),
         marker_kind="expecto",
         cleanup_smt=True,
@@ -333,6 +456,10 @@ def _make_evalplus_nl2_unit(
     rq: str,
     limit: int | None,
     sample_ids: Sequence[str] | None = None,
+    validation_sampling_mode: str | None = None,
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int | None = None,
 ) -> ExperimentUnit:
     run_dir = _run_dir(layout, benchmark, variant_name)
     return ExperimentUnit(
@@ -342,7 +469,15 @@ def _make_evalplus_nl2_unit(
         variant=variant_name,
         run_dir=run_dir,
         command=_build_nl2_evalplus_command(
-            benchmark, variant_name, run_dir, limit, sample_ids
+            benchmark,
+            variant_name,
+            run_dir,
+            limit,
+            sample_ids,
+            validation_sampling_mode,
+            validation_positive_cap,
+            validation_negative_cap,
+            validation_sampling_seed,
         ),
         marker_kind="nl2_evalplus",
     )
@@ -352,6 +487,12 @@ def _make_defects4j_expecto_unit(
     layout: ArtifactLayout,
     rq: str,
     limit: int | None,
+    validation_sampling_mode: str | None = None,
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int | None = None,
+    expecto_n_completions: int | None = None,
+    expecto_max_attempts: int | None = None,
 ) -> ExperimentUnit:
     run_dir = _run_dir(layout, "defects4j", "expecto")
     return ExperimentUnit(
@@ -360,7 +501,16 @@ def _make_defects4j_expecto_unit(
         benchmark="defects4j",
         variant="expecto",
         run_dir=run_dir,
-        command=_build_defects4j_expecto_command(run_dir, limit),
+        command=_build_defects4j_expecto_command(
+            run_dir,
+            limit,
+            validation_sampling_mode,
+            validation_positive_cap,
+            validation_negative_cap,
+            validation_sampling_seed,
+            expecto_n_completions,
+            expecto_max_attempts,
+        ),
         marker_kind="expecto",
         cleanup_smt=True,
     )
@@ -391,6 +541,12 @@ def build_rq_units(
     limit: int | None = None,
     evalplus_sample_ids: dict[str, Sequence[str]] | None = None,
     defects4j_limit: int | None = None,
+    validation_sampling_mode: str | None = None,
+    validation_positive_cap: int | None = None,
+    validation_negative_cap: int | None = None,
+    validation_sampling_seed: int | None = None,
+    expecto_n_completions: int | None = None,
+    expecto_max_attempts: int | None = None,
 ) -> list[ExperimentUnit]:
     if rq not in RQ_CHOICES:
         raise click.ClickException(f"Unsupported RQ: {rq}")
@@ -404,13 +560,13 @@ def build_rq_units(
             units.extend(
                 [
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "ts", rq, limit, sample_ids
+                        layout, benchmark, "ts", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
                     ),
                     _make_evalplus_nl2_unit(
-                        layout, benchmark, "nl2_base", rq, limit, sample_ids
+                        layout, benchmark, "nl2_base", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed
                     ),
                     _make_evalplus_nl2_unit(
-                        layout, benchmark, "nl2_simple", rq, limit, sample_ids
+                        layout, benchmark, "nl2_simple", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed
                     ),
                 ]
             )
@@ -422,13 +578,13 @@ def build_rq_units(
             units.extend(
                 [
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "mono", rq, limit, sample_ids
+                        layout, benchmark, "mono", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
                     ),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "topdown", rq, limit, sample_ids
+                        layout, benchmark, "topdown", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
                     ),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "ts", rq, limit, sample_ids
+                        layout, benchmark, "ts", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
                     ),
                 ]
             )
@@ -440,13 +596,13 @@ def build_rq_units(
             units.extend(
                 [
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "ts", rq, limit, sample_ids
+                        layout, benchmark, "ts", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
                     ),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "without_tc", rq, limit, sample_ids
+                        layout, benchmark, "without_tc", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
                     ),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "without_smt", rq, limit, sample_ids
+                        layout, benchmark, "without_smt", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
                     ),
                 ]
             )
@@ -456,7 +612,7 @@ def build_rq_units(
         )
         units.extend(
             [
-                _make_defects4j_expecto_unit(layout, rq, effective_defects4j_limit),
+                _make_defects4j_expecto_unit(layout, rq, effective_defects4j_limit, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts),
                 _make_defects4j_nl2_unit(
                     layout, "nl2_base", rq, effective_defects4j_limit
                 ),
@@ -770,6 +926,7 @@ def _run_mini_profile_by_rq(
             rq,
             evalplus_sample_ids=MINI_EVALPLUS_SAMPLE_IDS,
             defects4j_limit=MINI_DEFECTS4J_LIMIT,
+            **_validation_sampling_kwargs(MINI_VALIDATION_LIMIT),
         )
         execute_units(units, force=force, dry_run=dry_run)
         generate_figures_for_rq(layout, rq, force=force, dry_run=dry_run)
@@ -816,12 +973,33 @@ def full(output_root: Path, force: bool, dry_run: bool) -> None:
     default=None,
     help="Optional sample limit for the selected RQ.",
 )
+@click.option(
+    "--validation-limit",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Optional validation test-case cap applied to both positive and negative validation sets.",
+)
+@click.option(
+    "--expecto-n-completions",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Optional override for Expecto --n_completions in this run.",
+)
+@click.option(
+    "--expecto-max-attempts",
+    type=click.IntRange(min=1),
+    default=None,
+    help="Optional override for Expecto --max_attempts in this run.",
+)
 @click.option("--force", is_flag=True, help="Rerun completed experiment units.")
 @click.option("--dry-run", is_flag=True, help="Print commands without executing them.")
 def rq(
     rq: str,
     output_root: Path,
     limit: int | None,
+    validation_limit: int | None,
+    expecto_n_completions: int | None,
+    expecto_max_attempts: int | None,
     force: bool,
     dry_run: bool,
 ) -> None:
@@ -829,7 +1007,14 @@ def rq(
 
     layout = _layout(output_root, STANDARD_PROFILE_NAME)
     _print_summary(layout)
-    units = build_rq_units(layout, rq, limit=limit)
+    units = build_rq_units(
+        layout,
+        rq,
+        limit=limit,
+        **_validation_sampling_kwargs(validation_limit),
+        expecto_n_completions=expecto_n_completions,
+        expecto_max_attempts=expecto_max_attempts,
+    )
     execute_units(units, force=force, dry_run=dry_run)
     generate_figures_for_rq(layout, rq, force=force, dry_run=dry_run)
 
