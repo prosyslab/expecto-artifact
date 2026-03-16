@@ -39,7 +39,7 @@ docker build -t expecto-artifact .
 
 **2. Run the container:**
 ```bash
-docker run -it --name expecto-artifact expecto-artifact zsh
+docker run -it --name expecto-artifact prosyslab/expecto-artifact zsh
 ```
 
 **3. Inside the container, create `.env` in `/workspace/expecto-artifact` and set the API key:**
