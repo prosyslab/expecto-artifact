@@ -23,21 +23,14 @@ In the paper, the experiments were conducted with:
 
 ## Setup with Docker
 
-**1. Pull, Build, or Load the Docker image:**
+**1. Pull or Load the Docker image:**
 
 Pull (Recommended):
 ```bash
 docker pull prosyslab/expecto-artifact
 ```
 
-Build:
-```bash
-git clone https://github.com/prosyslab/expecto-artifact
-cd expecto-artifact
-docker build -t expecto-artifact .
-```
-
-Load `expecto-artifact.tar.gz` from Zenodo):
+Load `expecto-artifact.tar.gz` from Zenodo:
 ```bash
 gunzip -c expecto-artifact.tar.gz | docker load
 ```
