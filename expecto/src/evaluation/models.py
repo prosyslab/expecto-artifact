@@ -1,4 +1,5 @@
 import json
+import hashlib
 import math
 import sys
 import uuid
@@ -101,6 +102,8 @@ RESULT_STORE_SAMPLES_DIRNAME = "samples"
 RESULT_STORE_MANIFEST_FILENAME = "manifest.json"
 RESULT_STORE_FORMAT = "evaluation_result_store"
 RESULT_STORE_VERSION = 1
+RESULT_STORE_MAX_FILENAME_BYTES = 255
+RESULT_STORE_SAMPLE_HASH_LENGTH = 16
 STRIPPED_METADATA_KEYS = {
     "test_list",
     "mutated_test_list",
@@ -317,7 +320,24 @@ def build_persisted_sample_file(sample: Sample) -> PersistedSampleFile:
 
 
 def build_sample_file_name(sample_id: str) -> str:
-    return f"{quote(sample_id, safe='')}.json"
+    quoted_sample_id = quote(sample_id, safe="")
+    candidate = f"{quoted_sample_id}.json"
+    if len(candidate.encode("utf-8")) <= RESULT_STORE_MAX_FILENAME_BYTES:
+        return candidate
+
+    digest = hashlib.sha256(sample_id.encode("utf-8")).hexdigest()[
+        :RESULT_STORE_SAMPLE_HASH_LENGTH
+    ]
+    suffix = f"--{digest}.json"
+    max_prefix_length = RESULT_STORE_MAX_FILENAME_BYTES - len(suffix)
+    truncated_prefix = quoted_sample_id[:max_prefix_length]
+
+    # Avoid leaving a partial percent-escape at the end after truncation.
+    last_escape_start = truncated_prefix.rfind("%")
+    if last_escape_start != -1 and len(truncated_prefix) - last_escape_start < 3:
+        truncated_prefix = truncated_prefix[:last_escape_start]
+
+    return f"{truncated_prefix}{suffix}"
 
 
 def _load_manifest(manifest_path: Path) -> EvaluationResultManifest:
