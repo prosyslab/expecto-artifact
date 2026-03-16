@@ -762,35 +762,25 @@ def _echo_unit_status(unit: ExperimentUnit, status: str) -> None:
     click.echo(f"[{status}] {unit.rq} {benchmark_label} {unit.variant}")
 
 
-def _ensure_dir(path: Path, *, dry_run: bool) -> None:
-    if dry_run:
-        return
+def _ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def _remove_tree(path: Path, *, dry_run: bool) -> None:
+def _remove_tree(path: Path) -> None:
     if not path.exists():
-        return
-    if dry_run:
-        click.echo(f"Would remove existing directory: {path}")
         return
     shutil.rmtree(path)
 
 
-def _run_subprocess(args: Sequence[str], *, dry_run: bool) -> None:
+def _run_subprocess(args: Sequence[str]) -> None:
     click.echo(_format_command(args))
-    if dry_run:
-        return
     subprocess.run(args, cwd=PROJECT_ROOT, check=True)
 
 
-def _cleanup_smt_processes(*, dry_run: bool) -> None:
+def _cleanup_smt_processes() -> None:
     if shutil.which("pkill") is None:
         return
     args = ("pkill", "-f", "smt")
-    if dry_run:
-        click.echo(_format_command(args))
-        return
     subprocess.run(
         args,
         cwd=PROJECT_ROOT,
@@ -804,7 +794,6 @@ def execute_units(
     units: Sequence[ExperimentUnit],
     *,
     force: bool,
-    dry_run: bool,
 ) -> None:
     for unit in units:
         if unit.is_complete() and not force:
@@ -812,20 +801,17 @@ def execute_units(
             continue
 
         if unit.run_dir.exists():
-            _remove_tree(unit.run_dir, dry_run=dry_run)
+            _remove_tree(unit.run_dir)
 
-        _ensure_dir(unit.run_dir.parent, dry_run=dry_run)
+        _ensure_dir(unit.run_dir.parent)
         _echo_unit_status(unit, "run")
-        _run_subprocess(unit.command, dry_run=dry_run)
+        _run_subprocess(unit.command)
 
         if unit.cleanup_smt:
-            _cleanup_smt_processes(dry_run=dry_run)
+            _cleanup_smt_processes()
 
 
-def _write_json(path: Path, payload: object, *, dry_run: bool) -> None:
-    if dry_run:
-        click.echo(f"Would write config: {path}")
-        return
+def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n")
 
@@ -921,7 +907,6 @@ def generate_figures_for_rq(
     rq: str,
     *,
     force: bool,
-    dry_run: bool,
 ) -> None:
     config_path = layout.configs_root / f"{rq}.json"
     output_dir = _figure_output_dir(layout, rq)
@@ -966,13 +951,13 @@ def generate_figures_for_rq(
     else:
         raise click.ClickException(f"Unsupported RQ: {rq}")
 
-    _write_json(config_path, payload, dry_run=dry_run)
+    _write_json(config_path, payload)
     if not force and all(path.exists() for path in expected_outputs):
         click.echo(f"[skip] figures {rq} -> {output_dir}")
         return
-    _ensure_dir(output_dir, dry_run=dry_run)
+    _ensure_dir(output_dir)
     click.echo(f"[figure] {rq} -> {output_dir}")
-    _run_subprocess(figure_args, dry_run=dry_run)
+    _run_subprocess(figure_args)
 
 
 def _layout(output_root: Path, profile_name: str) -> ArtifactLayout:
@@ -989,20 +974,18 @@ def _run_profile_by_rq(
     layout: ArtifactLayout,
     *,
     force: bool,
-    dry_run: bool,
     limit: int | None = None,
 ) -> None:
     for rq in RQ_CHOICES:
         units = build_rq_units(layout, rq, limit=limit)
-        execute_units(units, force=force, dry_run=dry_run)
-        generate_figures_for_rq(layout, rq, force=force, dry_run=dry_run)
+        execute_units(units, force=force)
+        generate_figures_for_rq(layout, rq, force=force)
 
 
 def _run_mini_profile_by_rq(
     layout: ArtifactLayout,
     *,
     force: bool,
-    dry_run: bool,
 ) -> None:
     for rq in RQ_CHOICES:
         units = build_rq_units(
@@ -1012,8 +995,8 @@ def _run_mini_profile_by_rq(
             defects4j_sample_ids=MINI_DEFECTS4J_SAMPLE_IDS,
             **_validation_sampling_kwargs(MINI_VALIDATION_LIMIT),
         )
-        execute_units(units, force=force, dry_run=dry_run)
-        generate_figures_for_rq(layout, rq, force=force, dry_run=dry_run)
+        execute_units(units, force=force)
+        generate_figures_for_rq(layout, rq, force=force)
 
 
 @click.group()
@@ -1033,17 +1016,12 @@ def cli() -> None:
     is_flag=True,
     help="Run again even if the output files already exist.",
 )
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Show the commands first without actually running them.",
-)
-def full(output_root: Path, force: bool, dry_run: bool) -> None:
+def full(output_root: Path, force: bool) -> None:
     """Run all experiments required for RQ1-RQ4."""
 
     layout = _layout(output_root, STANDARD_PROFILE_NAME)
     _print_summary(layout)
-    _run_profile_by_rq(layout, force=force, dry_run=dry_run)
+    _run_profile_by_rq(layout, force=force)
 
 
 def _run_single_rq(
@@ -1055,7 +1033,6 @@ def _run_single_rq(
     expecto_max_attempts: int | None,
     mini_mode: bool,
     force: bool,
-    dry_run: bool,
 ) -> None:
     if mini_mode and limit is not None:
         raise click.UsageError("--mini cannot be combined with --limit.")
@@ -1084,8 +1061,8 @@ def _run_single_rq(
         rq_name,
         **build_kwargs,
     )
-    execute_units(units, force=force, dry_run=dry_run)
-    generate_figures_for_rq(layout, rq_name, force=force, dry_run=dry_run)
+    execute_units(units, force=force)
+    generate_figures_for_rq(layout, rq_name, force=force)
 
 
 def _add_rq_command(rq_name: str) -> None:
@@ -1131,11 +1108,6 @@ def _add_rq_command(rq_name: str) -> None:
         is_flag=True,
         help="Run again even if the output files already exist.",
     )
-    @click.option(
-        "--dry-run",
-        is_flag=True,
-        help="Show the commands first without actually running them.",
-    )
     def rq_command(
         output_root: Path,
         limit: int | None,
@@ -1144,7 +1116,6 @@ def _add_rq_command(rq_name: str) -> None:
         expecto_max_attempts: int | None,
         mini_mode: bool,
         force: bool,
-        dry_run: bool,
     ) -> None:
         """Run one research question."""
 
@@ -1157,7 +1128,6 @@ def _add_rq_command(rq_name: str) -> None:
             expecto_max_attempts,
             mini_mode,
             force,
-            dry_run,
         )
 
 
@@ -1177,21 +1147,15 @@ for _rq_name in RQ_CHOICES:
     is_flag=True,
     help="Run again even if the output files already exist.",
 )
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Show the commands first without actually running them.",
-)
 def mini(
     output_root: Path,
     force: bool,
-    dry_run: bool,
 ) -> None:
     """Run a faster fixed-sample mini profile."""
 
     layout = _layout(output_root, MINI_PROFILE_NAME)
     _print_summary(layout)
-    _run_mini_profile_by_rq(layout, force=force, dry_run=dry_run)
+    _run_mini_profile_by_rq(layout, force=force)
 
 
 @cli.command()
@@ -1232,24 +1196,12 @@ def mini(
     default=None,
     help="Comma-separated benchmark problem IDs to run.",
 )
-@click.option(
-    "--force",
-    is_flag=True,
-    help="Run again even if the output files already exist.",
-)
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Show the commands first without actually running them.",
-)
 def target(
     benchmark: str,
     variant: str,
     output_root: Path,
     limit: int | None,
     sample_ids: str | None,
-    force: bool,
-    dry_run: bool,
 ) -> None:
     """Run one benchmark-specific experiment target."""
 
@@ -1267,7 +1219,7 @@ def target(
         limit=limit,
         sample_ids=parsed_sample_ids,
     )
-    execute_units([unit], force=force, dry_run=dry_run)
+    execute_units([unit], force=True)
 
 
 if __name__ == "__main__":
