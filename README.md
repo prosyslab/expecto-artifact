@@ -50,20 +50,14 @@ OPENAI_API_KEY=YOUR_KEY_HERE
 EOF
 ```
 
-**4. Before running the artifact, download the dataset bundle from Zenodo and extract it at the repository root.**
-
-```bash
-wget -O datasets.tar.gz https://zenodo.org/records/19042721/files/datasets.tar.gz
-tar -xzf datasets.tar.gz
-```
-
-After extraction, the repository should contain the `datasets/` directory with the benchmark files used by the artifact.
-
-**5. Run the test to confirm that the setup is complete (takes about 2 minutes):**
+**4. Run the test to confirm that the setup is complete (takes about 2 minutes):**
 
 ```bash
 python3 scripts/test.py
 ```
+
+This script reproduces the creation, evaluation, and figure generation process for RQ1.
+If the output appears as shown below, this confirms that all settings have been configured correctly.
 
 Expected output:
 
