@@ -4,7 +4,7 @@ This repository contains the artifact implementation for the paper *Expecto: Ext
 
 # 1. Getting started
 
-## System requirements
+## 1.1 System requirements
 The experiments in the paper were conducted with the following setup:
 
 - Ubuntu 22.04
@@ -13,7 +13,7 @@ The experiments in the paper were conducted with the following setup:
 - 512 GB RAM
 - 256 GB storage
 
-## Setup with Docker
+## 1.2 Setup with Docker
 
 ### Step 1. Pull or load the Docker image
 
@@ -134,44 +134,7 @@ This section explains how to generate and evaluate a specific benchmark problem 
 In the paper, we used three different benchmarks, four Expecto variant configurations, and two NL2Postcond variant configurations.
 This section shows how to run any benchmark by specifying the problem ID for each of the 3 x (4 + 2) = 18 possible combinations.
 
-## 3.1 How to run
-```bash
-python3 scripts/run_artifact.py target \
-  --benchmark <BENCHMARK> \
-  --variant <VARIANT> \
-  --sample-ids <SAMPLE-IDS>
-```
-
-- `BENCHMARK` specifies which benchmark to generate. You can choose one of `apps`, `humaneval_plus`, or `defects4j`.
-- `VARIANT` specifies the Expecto or NL2Postcond configuration used in the paper.
-  - For Expecto, the following four configurations are available:
-    1. `mono`: the monolithic synthesis without top-down decomposition or tree search (section 4.3 in the paper)
-    2. `topdown`: the top-down synthesis without tree search (section 4.3 in the paper)
-    3. `ts`: the top-down synthesis with tree search (sections 4.2, 4.3, 4.4, and 4.5 in the paper)
-    4. `without_tc`: the top-down tree-search synthesis without test cases (section 4.4 in the paper)
-  - For NL2Postcond, the following two configurations are available:
-    1. `nl2_base`: the NL2Postcond base prompt strategy (sections 4.2 and 4.5 in the paper)
-    2. `nl2_simple`: the NL2Postcond simple prompt strategy (sections 4.2 and 4.5 in the paper)
-- `SAMPLE-IDS` specifies the IDs of the benchmark problems to generate as a comma-separated list. For example, you can provide `15,23,56`. You can find the list of available problem IDs for each benchmark in `/workspace/expecto-artifact/datasets/available_target_ids.csv`.
-
-## 3.2 What this does
-This command generates the LLM's raw output and evaluates the generated specifications for soundness and completeness.
-The generated outputs and evaluation results are saved at `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<VARIANT>`.
-After the evaluation is complete, the `target` command also generates `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<VARIANT>/sample_results.json`, so you can immediately inspect the classification result for each sample.
-
-`sample_results.json` is a list of objects per sample, and each object contains the following fields:
-
-- `id`: the sample ID
-- `classification`: the sample classification result
-  - `S&C`: sound and complete
-  - `S`: sound but incomplete
-  - `C`: complete but unsound
-  - `W`: neither sound nor complete
-- `postcondition`: the generated postcondition
-  - Expecto generates postconditions in the form of `predicate spec(...) { ... }`
-  - NL2Postcond generates postconditions in the form of `assert ...`
-
-## 3.3 Example: APPS problem `75` (Running example in the paper)
+## 3.1 Reproducing the paper's motivating example: APPS problem `75`
 To compare Expecto (`ts`) with the two NL2Postcond variants (`nl2_base` and `nl2_simple`) on the motivating example of the paper (APPS problem `75`), run the following three commands:
 
 ```bash
@@ -199,7 +162,7 @@ Each command writes its result to:
   {
     "id": "75",
     "classification": "S&C",
-    "postcondition": "predicate spec(n: int, m: int, grid: list[string], out_status: string, out_x: int, out_y: int) {\n    (if (out_status == \"YES\") then\n        (((1 <= out_x <= n) ∧\n            (1 <= out_y <= m)) ∧\n            WipesOutAllWalls(grid, n, m, (out_x - 1), (out_y - 1)))\n    else\n        (¬ (∃(x: int, y: int) ::\n            (((0 <= x < n) ∧\n                (0 <= y < m)) ∧\n                WipesOutAllWalls(grid, n, m, x, y)))))\n}\n\npredicate WipesOutAllWalls(grid: list[string], n: int, m: int, x: int, y: int) {\n    (∀(i: int, j: int) ::\n        ((((0 <= i < n) ∧\n            (0 <= j < m)) ∧\n            (grid[i][j] == '*')) ==>\n            ((i == x) ∨ (j == y))))\n}"
+    "postcondition": "predicate spec(n: int, m: int, grid: list[string], out_status: string, out_x: int, out_y: int) { ... }"
   }
 ]
 ```
@@ -209,38 +172,79 @@ Each command writes its result to:
   {
     "id": "75",
     "classification": "S",
-    "postcondition": "assert out_status == 'NO' and all((any((grid[i][j] == '*' for i in range(n) if i != r)) and any((grid[r][j] == '*' for j in range(m) if j != c)) for r in range(n) for c in range(m))) or (out_status == 'YES' and 1 <= out_x <= n and (1 <= out_y <= m) and all((grid[i][j] != '*' or i == out_x - 1 or j == out_y - 1 for i in range(n) for j in range(m))))"
+    "postcondition": "assert ..."
   }
 ]
 ```
-
 - `/workspace/data/experiment/artifact/target/runs/apps/nl2_simple/sample_results.json`:
 ```json
 [
   {
     "id": "75",
     "classification": "C",
-    "postcondition": "assert out_status == 'NO' or all((grid[i][out_y - 1] != '*' or grid[out_x - 1][j] != '*' or (i == out_x - 1 or j == out_y - 1) for i in range(n) for j in range(m) if grid[i][j] == '*'))"
+    "postcondition": "assert ..."
   }
 ]
 ```
 
+Each `sample_results.json` entry contains:
+
+- `id`: the benchmark problem ID. Here it is always `75`.
+- `classification`: the evaluation result for the generated specification. In the paper's comparison, Expecto (`ts`) produces `S&C` (sound and complete), while the two NL2Postcond variants produce `S` or `C`, matching the discussion that their monolithic outputs are incomplete or unsound.
+- `postcondition`: the generated formal specification itself. Expecto emits a DSL specification like `predicate spec(...)`. NL2Postcond emits a single assertion like `assert ...`.
+
+## 3.2 How to run other target problems
+```bash
+python3 scripts/run_artifact.py target \
+  --benchmark <BENCHMARK> \
+  --variant <VARIANT> \
+  --sample-ids <SAMPLE-IDS>
+```
+
+- `BENCHMARK` specifies which benchmark to generate. You can choose one of `apps`, `humaneval_plus`, or `defects4j`.
+- `VARIANT` specifies the Expecto or NL2Postcond configuration used in the paper.
+  - For Expecto, the following four configurations are available:
+    1. `mono`: the monolithic synthesis without top-down decomposition or tree search (section 4.3 in the paper)
+    2. `topdown`: the top-down synthesis without tree search (section 4.3 in the paper)
+    3. `ts`: the top-down synthesis with tree search (sections 4.2, 4.3, 4.4, and 4.5 in the paper)
+    4. `without_tc`: the top-down tree-search synthesis without test cases (section 4.4 in the paper)
+  - For NL2Postcond, the following two configurations are available:
+    1. `nl2_base`: the NL2Postcond base prompt strategy (sections 4.2 and 4.5 in the paper)
+    2. `nl2_simple`: the NL2Postcond simple prompt strategy (sections 4.2 and 4.5 in the paper)
+- `SAMPLE-IDS` specifies the IDs of the benchmark problems to generate as a comma-separated list. For example, you can provide `15,23,56`. You can find the list of available problem IDs for each benchmark in `/workspace/expecto-artifact/datasets/available_target_ids.csv`.
+
+## 3.3 What this command does
+This command generates the LLM's raw output and evaluates the generated specifications for soundness and completeness.
+The generated outputs and evaluation results are saved at `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<VARIANT>`.
+After the evaluation is complete, the runner also generates `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<VARIANT>/sample_results.json`, so you can immediately inspect the classification result for each sample.
+
+`sample_results.json` is a list of objects per sample, and each object contains the following fields:
+
+- `id`: the sample ID
+- `classification`: the sample classification result
+  - `S&C`: sound and complete
+  - `S`: sound but incomplete
+  - `C`: complete but unsound
+  - `W`: neither sound nor complete
+- `postcondition`: the generated postcondition
+  - Expecto generates postconditions in the form of `predicate spec(...) { ... }`
+  - NL2Postcond generates postconditions in the form of `assert ...`
+
 # 4. Reproducing the full paper results
 
-This is the most complete run. It executes everything needed for `RQ1` to `RQ4`.
+4장에서는 `RQ1`부터 `RQ4`까지 논문의 모든 실험을 실행하는 `full` 명령에 대해서 설명합니다.
+3장에서 수행한 specification generation과 evaluation을 전체 벤치마크에 대해서 수행한 후, 논문 figure와 table 형태로 최종 산출물을 생성합니다.
+`full` 명령의 총 예상 소요 시간은 약 50시간입니다.
 
-Expected runtime for `full`: about 50 hours.
-
+## 4.1 How to run
 ```bash
 python3 scripts/run_artifact.py full
 ```
 
-Expected output:
-- Runs all experiments required for `RQ1` to `RQ4` and generates all paper tables and figures.
-- Raw data:
-  - `/workspace/data/experiment/artifact/full/runs/apps/`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/`
-  - `/workspace/data/experiment/artifact/full/runs/defects4j/`
+## 4.2 What this does
+- 실행 및 :
+  - `/workspace/data/experiment/artifact/full/runs/<BENCHMARK>/<VARIANT>/`
+  - `/workspace/data/experiment/artifact/full/runs/<BENCHMARK>/<VARIANT>/sample_results.json`
 - Outputs:
   - Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
   - Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
@@ -253,6 +257,7 @@ By default, the runner skips work that already has output files. Use `--force` i
 ```bash
 python3 scripts/run_artifact.py full --force
 ```
+
 # 5. Reproducing specific RQs
 
 Use `rq1`, `rq2`, `rq3`, or `rq4` when you want one research question and its outputs without running the entire artifact.
@@ -267,6 +272,7 @@ Expected output:
 - Runs only the selected research question under the `full` profile.
 - Raw data:
   - `/workspace/data/experiment/artifact/full/runs/`
+  - Each executed variant also writes `/workspace/data/experiment/artifact/full/runs/<BENCHMARK>/<VARIANT>/sample_results.json`
 - Outputs:
   - `/workspace/data/experiment/artifact/full/figures/<RQ_NUMBER>/`
 
@@ -371,6 +377,7 @@ Expected output:
 - Runs reduced versions of `RQ1` to `RQ4` and generates reduced figures and tables.
 - Raw data:
   - `/workspace/data/experiment/artifact/mini/runs/`
+  - Each executed variant also writes `/workspace/data/experiment/artifact/mini/runs/<BENCHMARK>/<VARIANT>/sample_results.json`
 - Outputs:
   - `/workspace/data/experiment/artifact/mini/figures/`
 
@@ -383,6 +390,7 @@ Expected output:
 - Runs only the selected RQ on the fixed mini subset and writes reduced outputs for that RQ only.
 - Raw data:
   - `/workspace/data/experiment/artifact/mini/runs/`
+  - Each executed variant also writes `/workspace/data/experiment/artifact/mini/runs/<BENCHMARK>/<VARIANT>/sample_results.json`
 - Outputs:
   - `/workspace/data/experiment/artifact/mini/figures/<RQ_NUMBER>/`
 
