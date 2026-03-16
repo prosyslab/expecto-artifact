@@ -194,17 +194,9 @@ Where the results are stored:
 - Final outputs (paper mapping):
     - [`Table 1 (RQ1 main comparison)`](/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf)
     - [`Fig. 8 (RQ1 threshold analysis)`](/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf)
-    - [`Fig. 9 (RQ2 ablation)`](/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf)
-    - [`Fig. 10 (RQ3 test-case ablation)`](/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf)
+    - [`Fig. 9 (RQ2 generation algorithm ablation)`](/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf)
+    - [`Fig. 10 (RQ3 test-case and SMT-based validation ablation)`](/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf)
     - [`Table 2 (RQ4 Defects4J comparison)`](/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf)
-
-How this maps to the paper:
-
-- `§4.1 Experimental Setup`: benchmark choices, baselines, and implementation settings
-- `§4.2 RQ1`: baseline comparison on HumanEval+ and APPS
-- `§4.3 RQ2`: top-down and tree-search ablation
-- `§4.4 RQ3`: test-case and validation ablation
-- `§4.5 RQ4`: Defects4J bug-detection evaluation
 
 What to check:
 
@@ -213,12 +205,6 @@ What to check:
 
 ### Reproduce one paper claim at a time: `rq`
 Use `rq` when you want one paper result and its associated outputs without running the full artifact.
-
-Preview one RQ without executing:
-
-```bash
-python3 scripts/run_artifact.py rq --rq rq1 --dry-run
-```
 
 #### RQ1. Effectiveness of Expecto in formal specification generation
 Run `RQ1`:
@@ -308,9 +294,9 @@ How this maps to the paper:
 
 - Paper section: `§4.4`
 - Figure coverage: `Fig. 10`
-- Methodology linkage: the `without_smt` ablation isolates the SMT-based validation logic described in `§3.4`
+- Methodology linkage: `without_smt` and `without_tc` ablations isolate the SMT-based validation logic and test case usage in validation step in `§3.4`
 - Benchmarks: `HumanEval+` and `APPS`
-- Claim being checked: test cases improve robustness, and the validation pipeline materially contributes to Expecto's final quality
+- Claim being checked: test cases and SMT-based validation improve robustness of specification generation
 
 What to check:
 
