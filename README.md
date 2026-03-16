@@ -320,11 +320,16 @@ How this maps to the paper:
 - Benchmark: `Defects4J`
 - Claim being checked: Expecto generates more bug-detectable correct specifications than NL2Postcond on real-world Java bugs
 
-## Quick check: `mini`
-Run the reduced sweep:
+# 6. Run a reduced benchmarks for quick inspection
 
+Run RQ1-RQ4 with a reduced fixed-sample profile:
 ```bash
 python3 scripts/run_artifact.py mini
+```
+
+Run a specific RQ with a reduced fixed-sample profile:
+```bash
+python3 scripts/run_artifact.py <RQ_NUMBER> --mini
 ```
 
 What this command does:
