@@ -9,10 +9,10 @@ The paper studies the following four research questions:
 - `RQ3` How do test cases and SMT-based validation contribute to the performance of Expecto?
 - `RQ4` Can Expecto be practically applied to detect functional bugs in real-world software?
 
-The artifact entrypoint is [`./scripts/run_artifact.py`](file:///workspace/expecto-artifact/scripts/run_artifact.py).
+The artifact entrypoint is `./scripts/run_artifact.py`.
 
-## 1. Getting started
-### System requirements
+# 1. Getting started
+## System requirements
 In the paper, the experiments were conducted with:
 
 - Ubuntu 22.04
@@ -21,7 +21,7 @@ In the paper, the experiments were conducted with:
 - 512 GB RAM
 - 256 GB storage
 
-### Setup with Docker
+## Setup with Docker
 
 **1. Pull or Build the Docker image (You only have to do one of them):**
 
@@ -62,7 +62,7 @@ After extraction, the repository should contain the `datasets/` directory with t
 **5. Run the test to confirm that the setup is complete (takes about 2 minutes):**
 
 ```bash
-python3 scripts/test.py 
+python3 scripts/test.py
 ```
 
 Expected output:
@@ -94,7 +94,7 @@ Summary:
 ```
 
 ---
-## 2. Directory structure
+# 2. Directory structure
 ```text
 ├── README.md                          <- The top-level README (this file)
 ├── analyzer/                          <- Figure and table generation scripts
@@ -131,38 +131,10 @@ Generated outputs from the artifact runner are written under:
 ```
 
 ---
-## 3. Step-by-step reproduction with command, output, and paper mapping
-This section combines the command reference for paper reproduction and the RQ-oriented results guide for paper claims. You can follow it from top to bottom and check, for each command, what it does, where its results are written, and which paper claim it supports.
+# 3. Full reproduction
 
-All commands below use `/workspace/data/experiment/artifact` as the default `--output-root`.
+All commands use `/workspace/data/experiment/artifact` as the default `--output-root`. The artifact runner supports four modes: `full`, `rq`, `mini`, and `target`. Recommended flow: reproduce full first, then check outputs under `full/figures/`, then RQ-specific runs as needed.
 
-### Runner modes at a glance
-The main artifact runner supports four modes:
-
-- `full`: run all experiment units needed for `RQ1`-`RQ4`, then generate all figures and tables under `full/figures/`
-- `rq`: run only one research question and generate only that RQ's outputs under `full/figures/rq*/`, or under `mini/figures/rq*/` when `--mini` is used
-- `mini`: run a reduced sample sweep and write the reduced results under `mini/`
-- `target`: run one benchmark-specific experiment unit only and write only its raw run directory
-
-For every successful run, the artifact writes two kinds of outputs:
-
-- Raw experiment outputs under `.../runs/...`
-- Summary outputs under `.../figures/...` as `.pdf` and `.json`
-
-The raw run directories are considered complete when the following marker files exist:
-
-- Expecto unit: `evaluation_result/manifest.json`
-- HumanEval+/APPS NL2Postcond unit: `aggregated_result.json`
-- Defects4J NL2Postcond unit: `validation/aggregated.json`
-
-### Recommended usage flow
-Use the commands in this order if you want a predictable review path:
-
-1. Reproduce the full paper claims first: `python3 scripts/run_artifact.py full` (takes about 50 hours)
-2. Check the paper-mapped outputs under `full/figures/`
-3. Check the claims for each RQ described in RQ1-RQ4 sections below.
-
-### Full paper reproduction: `full`
 Run everything:
 
 **Expected runtime for `full`: about 50 hours.**
@@ -195,18 +167,19 @@ Where the results are stored:
   - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/`
   - `/workspace/data/experiment/artifact/full/runs/defects4j/`
 - Final outputs (paper mapping):
-    - [`Table 1 (RQ1 main comparison)`](file:///workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf)
-    - [`Fig. 8 (RQ1 threshold analysis)`](file:///workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf)
-    - [`Fig. 9 (RQ2 generation algorithm ablation)`](file:///workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf)
-    - [`Fig. 10 (RQ3 test-case and SMT-based validation ablation)`](file:///workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf)
-    - [`Table 2 (RQ4 Defects4J comparison)`](file:///workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf)
+    - `Table 1 (RQ1 main comparison)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
+    - `Fig. 8 (RQ1 threshold analysis)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
+    - `Fig. 9 (RQ2 generation algorithm ablation)`: `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
+    - `Fig. 10 (RQ3 test-case and SMT-based validation ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
+    - `Table 2 (RQ4 Defects4J comparison)`: `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
 What to check:
 
 - All paper-mapped files above exist after the run
 - The `full/runs/...` tree contains per-variant run directories for the benchmarks used by each RQ
 
-### Reproduce one paper claim at a time: `rq`
+---
+# 4. RQ reproduction
 Use `rq` when you want one paper result and its associated outputs without running the full artifact.
 
 > **Note:** If you have already completed the `full` run, all figures and tables for the paper will have been generated. There is no need to run `rq` separately unless you want to rerun or inspect a specific research question in detail.
@@ -219,7 +192,7 @@ python3 scripts/run_artifact.py rq --rq <RQ_NUMBER> --mini
 
 This uses the same fixed mini subsets as `mini`, but only for the requested RQ, and writes outputs under `/workspace/data/experiment/artifact/mini`.
 
-#### RQ1. Effectiveness of Expecto in formal specification generation
+## RQ1. Effectiveness of Expecto in formal specification generation
 Run `RQ1`:
 
 ```bash
@@ -237,8 +210,8 @@ Where the results are stored:
   - `/workspace/data/experiment/artifact/full/runs/apps/{ts,nl2_base,nl2_simple}`
   - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,nl2_base,nl2_simple}`
 - Outputs (paper mapping):
-    - [`Table 1 (RQ1 main comparison)`](file:///workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf)
-    - [`Fig. 8 (RQ1 threshold analysis)`](file:///workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf)
+    - `Table 1 (RQ1 main comparison)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
+    - `Fig. 8 (RQ1 threshold analysis)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
 
 How this maps to the paper:
 
@@ -252,7 +225,7 @@ What to check:
 - `evaluation.rq1.table.pdf` is the compiled table-only PDF artifact for the same comparison
 - `evaluation.thresholds.pdf` is the figure for the threshold analysis in `Fig. 8`
 
-#### RQ2. Effectiveness of the top-down specification synthesis with tree search
+## RQ2. Effectiveness of the top-down specification synthesis with tree search
 Run `RQ2`:
 
 ```bash
@@ -270,7 +243,7 @@ Where the results are stored:
   - `/workspace/data/experiment/artifact/full/runs/apps/{mono,topdown,ts}`
   - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{mono,topdown,ts}`
 - Outputs (paper mapping):
-    - [`Fig. 9 (RQ2 generation algorithm ablation)`](file:///workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf)
+    - `Fig. 9 (RQ2 generation algorithm ablation)`: `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
 
 How this maps to the paper:
 
@@ -283,7 +256,7 @@ What to check:
 
 - `evaluation.rq2.pdf` is the paper-facing visualization for `Fig. 9`
 
-#### RQ3. Impact of Test Cases and SMT-Based Validation on Specification Generation
+## RQ3. Impact of Test Cases and SMT-Based Validation on Specification Generation
 Run `RQ3`:
 
 ```bash
@@ -301,7 +274,7 @@ Where the results are stored:
   - `/workspace/data/experiment/artifact/full/runs/apps/{ts,without_tc,without_smt}`
   - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,without_tc,without_smt}`
 - Outputs (paper mapping):
-    - [`Fig. 10 (RQ3 test-case and SMT-based validation ablation)`](file:///workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf)
+    - `Fig. 10 (RQ3 test-case and SMT-based validation ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
 
 How this maps to the paper:
 
@@ -315,7 +288,7 @@ What to check:
 
 - `evaluation.rq3.testcase.pdf` includes both the `without_tc` and `without_smt` ablations against `ts`
 
-#### RQ4. Effectiveness of Expecto for bug detection in real-world software
+## RQ4. Effectiveness of Expecto for bug detection in real-world software
 Run `RQ4`:
 
 ```bash
@@ -332,7 +305,7 @@ Where the results are stored:
 - Raw runs:
   - `/workspace/data/experiment/artifact/full/runs/defects4j/{expecto,nl2_base,nl2_simple}`
 - Output (paper mapping):
-    - [`Table 2 (RQ4 Defects4J comparison)`](file:///workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf)
+    - `Table 2 (RQ4 Defects4J comparison)`: `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
 How this maps to the paper:
 
@@ -346,7 +319,7 @@ What to check:
 - `evaluation.rq4.defects4j.table.pdf` is the compiled table-only PDF for the same comparison
 - The corresponding raw run directories under `full/runs/defects4j/` exist for all three compared systems
 
-### Quick check: `mini`
+## Quick check: `mini`
 Run the reduced sweep:
 
 ```bash
@@ -355,7 +328,7 @@ python3 scripts/run_artifact.py mini
 
 What this command does:
 
-- Runs the same experiment families as `full`, but uses fixed benchmark subsets for the EvalPlus-style benchmarks instead of a prefix limit
+- Runs the same experiment families as `full`, but uses fixed benchmark subsets for the EvalPlus-style benchmarks
 - Uses these 20 APPS problem IDs: `15, 57, 23, 76, 83, 39, 101, 3701, 4004, 37, 94, 16, 61, 52, 42, 47, 72, 90, 4005, 71`
 - Uses these 20 HumanEval+ problem IDs: `22, 52, 75, 61, 83, 92, 34, 53, 73, 129, 140, 158, 54, 124, 6, 71, 32, 123, 162, 63`
 - Uses these 20 Defects4J task IDs:
@@ -381,19 +354,14 @@ What to check:
 - The `mini/runs/` and `mini/figures/` directories are created
 - Each `mini/figures/rq*/` directory contains the same output file types as the corresponding `full` run
 
-### Inspect one unit or rerun one failed cell: `target`
+---
+# 5. Target reproduction
 Run one benchmark-specific target:
 
 ```bash
 python3 scripts/run_artifact.py target --benchmark apps --family rq2 --variant topdown
 python3 scripts/run_artifact.py target --benchmark humaneval_plus --family rq3 --variant without_smt
 python3 scripts/run_artifact.py target --benchmark defects4j --family rq4 --variant nl2_base
-```
-
-Target mode also accepts `--limit` and `--force`:
-
-```bash
-python3 scripts/run_artifact.py target --benchmark apps --family rq2 --variant mono --limit 3 --force
 ```
 
 What this command does:
@@ -405,3 +373,55 @@ Where the results are stored:
 
 - `apps` and `humaneval_plus` targets: `/workspace/data/experiment/artifact/full/runs/<benchmark>/<variant>`
 - `defects4j` targets: `/workspace/data/experiment/artifact/full/runs/defects4j/<variant>`
+
+---
+# 6. Reproducing only a specific `target_id`
+If you want to reproduce exactly one benchmark instance instead of the default sweep, use `run_artifact.py target` with `--sample-ids`.
+
+General rules:
+
+- For `APPS` and `HumanEval+`, `target_id` is the numeric problem ID
+- For `Defects4J`, `target_id` is the full task ID string used in the dataset JSONL
+- You can pass multiple IDs as a comma-separated list if needed
+
+```bash
+python3 scripts/run_artifact.py target \
+  --benchmark apps \
+  --family rq2 \
+  --variant topdown \
+  --sample-ids 3701
+```
+
+This example reproduces only APPS problem `3701` for the `rq2/topdown` target, and writes the result to:
+
+- `/workspace/data/experiment/artifact/full/runs/apps/topdown`
+
+For `HumanEval+`, run:
+
+```bash
+python3 scripts/run_artifact.py target \
+  --benchmark humaneval_plus \
+  --family rq3 \
+  --variant without_smt \
+  --sample-ids 123
+```
+
+This example reproduces only HumanEval+ problem `123` for the `rq3/without_smt` target.
+
+For `Defects4J`, run:
+
+```bash
+python3 scripts/run_artifact.py target \
+  --benchmark defects4j \
+  --family rq4 \
+  --variant nl2_base \
+  --sample-ids "Chart_6_workspace_objdump_d4j_full_fresh_chart_6_source_org_jfree_chart_util_ShapeList_java_boolean_equals_Object_obj"
+```
+
+What this command does:
+
+- Reproduces only the requested `target_id` for the selected benchmark/variant
+- Preserves the same output directory layout used by Section 5 target runs
+- Does not generate paper-facing figures or tables automatically
+
+If you want the corresponding paper figure or table after reproducing a specific `target_id`, rerun the appropriate `rq` command once the needed raw runs are available.

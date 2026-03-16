@@ -220,6 +220,13 @@ def _serialize_sample_ids(sample_ids: Sequence[str] | None) -> str | None:
     return ",".join(sample_ids)
 
 
+def _parse_sample_ids(sample_ids: str | None) -> list[str] | None:
+    if sample_ids is None:
+        return None
+    parsed = [sample_id.strip() for sample_id in sample_ids.split(",") if sample_id.strip()]
+    return parsed or None
+
+
 def _resolve_expecto_variant(
     variant_name: str,
     *,
@@ -699,6 +706,7 @@ def build_target_unit(
     family: str,
     variant: str,
     limit: int | None = None,
+    sample_ids: Sequence[str] | None = None,
 ) -> ExperimentUnit:
     if family not in RQ_CHOICES:
         raise click.ClickException(f"Unsupported family: {family}")
@@ -713,16 +721,20 @@ def build_target_unit(
                 "RQ4 target mode only supports benchmark=defects4j"
             )
         if variant == "expecto":
-            return _make_defects4j_expecto_unit(layout, family, limit)
-        return _make_defects4j_nl2_unit(layout, variant, family, limit)
+            return _make_defects4j_expecto_unit(layout, family, limit, sample_ids)
+        return _make_defects4j_nl2_unit(layout, variant, family, limit, sample_ids)
 
     if benchmark not in EVALPLUS_BENCHMARKS:
         raise click.ClickException(
             "RQ1-RQ3 target mode supports benchmark=apps or benchmark=humaneval_plus"
         )
     if variant.startswith("nl2_"):
-        return _make_evalplus_nl2_unit(layout, benchmark, variant, family, limit)
-    return _make_evalplus_expecto_unit(layout, benchmark, variant, family, limit)
+        return _make_evalplus_nl2_unit(
+            layout, benchmark, variant, family, limit, sample_ids
+        )
+    return _make_evalplus_expecto_unit(
+        layout, benchmark, variant, family, limit, sample_ids
+    )
 
 
 def _format_command(args: Sequence[str]) -> str:
@@ -1161,6 +1173,12 @@ def mini(
     default=None,
     help="Optional sample limit for the targeted run.",
 )
+@click.option(
+    "--sample-ids",
+    type=str,
+    default=None,
+    help="Comma-separated benchmark problem IDs to run.",
+)
 @click.option("--force", is_flag=True, help="Rerun the targeted experiment unit.")
 @click.option("--dry-run", is_flag=True, help="Print commands without executing them.")
 def target(
@@ -1169,10 +1187,15 @@ def target(
     variant: str,
     output_root: Path,
     limit: int | None,
+    sample_ids: str | None,
     force: bool,
     dry_run: bool,
 ) -> None:
     """Run one benchmark-specific experiment target."""
+
+    parsed_sample_ids = _parse_sample_ids(sample_ids)
+    if limit is not None and parsed_sample_ids:
+        raise click.UsageError("Use either --limit or --sample-ids, not both.")
 
     layout = _layout(output_root, STANDARD_PROFILE_NAME)
     _print_summary(layout)
@@ -1182,6 +1205,7 @@ def target(
         family=family,
         variant=variant,
         limit=limit,
+        sample_ids=parsed_sample_ids,
     )
     execute_units([unit], force=force, dry_run=dry_run)
 
