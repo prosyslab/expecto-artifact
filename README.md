@@ -145,6 +145,7 @@ General rules:
 - For `APPS` and `HumanEval+`, `target_id` is the numeric problem ID
 - For `Defects4J`, `target_id` is the full task ID string used in the dataset JSONL
 - You can pass multiple IDs as a comma-separated list if needed
+- A full list of available IDs is provided in `datasets/available_target_ids.csv`
 
 ```bash
 python3 scripts/run_artifact.py target \
