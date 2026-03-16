@@ -262,7 +262,7 @@ It then processes the outputs into the same figure and table formats shown in th
   - Fig. 10 (RQ3 test-case ablation): `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
   - Table 2 (RQ4 Defects4J comparison): `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
-각각의 RQ에 대한 상세한 설명은 5장을 참조하세요.
+For a detailed explanation of each RQ, please refer to Chapter 5.
 
 # 5. Reproducing each RQs
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -190,8 +191,52 @@ def _check_sample_result_outputs(output_root: Path) -> bool:
     for relative_path in RQ1_SAMPLE_RESULT_FILES:
         output_path = output_root / relative_path
         exists = output_path.is_file()
-        _print_status(exists, "sample result output", str(output_path))
-        ok = ok and exists
+        if not exists:
+            _print_status(False, "sample result output", str(output_path))
+            ok = False
+            continue
+
+        try:
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            _print_status(
+                False,
+                "sample result output",
+                f"{output_path} (invalid JSON: {exc})",
+            )
+            ok = False
+            continue
+
+        if not isinstance(payload, list):
+            _print_status(
+                False,
+                "sample result output",
+                f"{output_path} (expected a JSON list)",
+            )
+            ok = False
+            continue
+
+        required_fields = {"id", "classification", "nl_description", "postcondition"}
+        missing_fields: list[str] = []
+        for index, entry in enumerate(payload):
+            if not isinstance(entry, dict):
+                missing_fields = [f"entry {index} is not an object"]
+                break
+            absent = sorted(required_fields.difference(entry))
+            if absent:
+                missing_fields = [f"entry {index} missing {', '.join(absent)}"]
+                break
+
+        if missing_fields:
+            _print_status(
+                False,
+                "sample result output",
+                f"{output_path} ({'; '.join(missing_fields)})",
+            )
+            ok = False
+            continue
+
+        _print_status(True, "sample result output", str(output_path))
     return ok
 
 

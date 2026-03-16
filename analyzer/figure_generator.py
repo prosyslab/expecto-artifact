@@ -200,6 +200,239 @@ def _normalize_exported_sample_id(benchmark: str, sample_id: Any) -> str:
     return normalized
 
 
+_APPS_QUESTION_BLOCK_PATTERN = re.compile(
+    r"## Question:\s*(.*?)\s*(?:## Test Cases:|\Z)",
+    flags=re.DOTALL,
+)
+_DEFECTS4J_METHOD_ID_SANITIZER = re.compile(r"[^0-9A-Za-z]+")
+
+
+def _normalize_nl_description(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
+
+
+def _extract_apps_question_block(text: str) -> str:
+    match = _APPS_QUESTION_BLOCK_PATTERN.search(text)
+    if match is None:
+        return _normalize_nl_description(text)
+    return _normalize_nl_description(match.group(1))
+
+
+def _extract_expecto_nl_description(sample: Sample, benchmark: str) -> str:
+    inspect_sample = sample.inspect_ai_sample
+    metadata = getattr(inspect_sample, "metadata", None)
+    if not isinstance(metadata, Mapping):
+        return ""
+
+    raw_input = metadata.get("input")
+    if not isinstance(raw_input, str):
+        return ""
+
+    if benchmark == "apps":
+        return _extract_apps_question_block(raw_input)
+    if benchmark == "humaneval_plus":
+        return _normalize_nl_description(raw_input)
+    return ""
+
+
+def _iter_json_array_records(path: Path) -> Iterable[dict[str, Any]]:
+    try:
+        import ijson
+    except ImportError:
+        payload = json.loads(path.read_text())
+        if isinstance(payload, list):
+            for item in payload:
+                if isinstance(item, dict):
+                    yield cast(dict[str, Any], item)
+        return
+
+    with path.open("rb") as handle:
+        for item in ijson.items(handle, "item"):
+            if isinstance(item, dict):
+                yield cast(dict[str, Any], item)
+
+
+def _resolve_evalplus_dataset_path(benchmark: str, run_dir: Path) -> Path:
+    if benchmark == "apps":
+        subset_path = run_dir / "_datasets" / "apps_subset.json"
+        if subset_path.is_file():
+            return subset_path
+        return project_root / "datasets" / "apps.json"
+    if benchmark == "humaneval_plus":
+        return project_root / "datasets" / "human_eval_plus.json"
+    raise click.ClickException(
+        f"Unsupported EvalPlus-style benchmark for nl_description export: {benchmark}"
+    )
+
+
+def _load_evalplus_nl_descriptions(
+    benchmark: str,
+    sample_ids: Iterable[str],
+    *,
+    run_dir: Path,
+) -> dict[str, str]:
+    remaining = {str(sample_id) for sample_id in sample_ids if str(sample_id).strip()}
+    if not remaining:
+        return {}
+
+    descriptions: dict[str, str] = {}
+    dataset_path = _resolve_evalplus_dataset_path(benchmark, run_dir)
+    for record in _iter_json_array_records(dataset_path):
+        sample_id = _normalize_exported_sample_id(benchmark, record.get("problem_id", ""))
+        if sample_id not in remaining:
+            continue
+        descriptions[sample_id] = _normalize_nl_description(record.get("prompt", ""))
+        remaining.remove(sample_id)
+        if not remaining:
+            break
+
+    return descriptions
+
+
+def _sanitize_defects4j_method_identifier(text: str) -> str:
+    sanitized = _DEFECTS4J_METHOD_ID_SANITIZER.sub("_", text).strip("_")
+    return sanitized or "method"
+
+
+def _build_defects4j_sample_id(
+    project: str,
+    bug_id: str,
+    file_path: str,
+    signature: str,
+    ids_count: dict[str, int],
+) -> str:
+    method_token = _sanitize_defects4j_method_identifier(f"{file_path}_{signature}")
+    base_id = f"{project}_{bug_id}_{method_token}"
+    ids_count[base_id] = ids_count.get(base_id, 0) + 1
+    if ids_count[base_id] == 1:
+        return base_id
+    return f"{base_id}_{ids_count[base_id]}"
+
+
+def _extract_defects4j_javadoc_description(javadoc: Any) -> str:
+    if not isinstance(javadoc, Mapping):
+        return ""
+    return _normalize_nl_description(javadoc.get("description"))
+
+
+def _load_defects4j_nl2_run_descriptions(
+    run_dir: Path,
+    sample_ids: Iterable[str],
+) -> dict[str, str]:
+    remaining = {str(sample_id) for sample_id in sample_ids if str(sample_id).strip()}
+    if not remaining:
+        return {}
+
+    descriptions: dict[str, str] = {}
+    jsonl_paths = sorted(
+        path
+        for path in run_dir.glob("*.jsonl")
+        if path.is_file() and not path.name.endswith(".final.jsonl")
+    )
+    for jsonl_path in jsonl_paths:
+        with jsonl_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                row = json.loads(stripped)
+                sample_id = _normalize_exported_sample_id(
+                    "defects4j", row.get("id", row.get("task_id", ""))
+                )
+                if sample_id not in remaining:
+                    continue
+                descriptions[sample_id] = _extract_defects4j_javadoc_description(
+                    row.get("javadoc")
+                )
+                remaining.remove(sample_id)
+                if not remaining:
+                    return descriptions
+
+    return descriptions
+
+
+def _load_defects4j_dataset_descriptions(
+    sample_ids: Iterable[str],
+) -> dict[str, str]:
+    remaining = {str(sample_id) for sample_id in sample_ids if str(sample_id).strip()}
+    if not remaining:
+        return {}
+
+    descriptions: dict[str, str] = {}
+    dataset_path = project_root / "datasets" / "defects4j.jsonl"
+    ids_count: dict[str, int] = {}
+    with dataset_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            bug = json.loads(stripped)
+            if not isinstance(bug, dict):
+                continue
+
+            project = str(bug.get("project", ""))
+            bug_id = str(bug.get("bug_id", ""))
+            for method_dump in bug.get("method_dumps", []):
+                if not isinstance(method_dump, dict):
+                    continue
+                method_info = method_dump.get("method_info", {})
+                if not isinstance(method_info, dict):
+                    continue
+                sample_id = _build_defects4j_sample_id(
+                    project,
+                    bug_id,
+                    str(method_info.get("file", "")),
+                    str(method_info.get("signature", "")),
+                    ids_count,
+                )
+                if sample_id not in remaining:
+                    continue
+                descriptions[sample_id] = _extract_defects4j_javadoc_description(
+                    method_info.get("javadoc")
+                )
+                remaining.remove(sample_id)
+                if not remaining:
+                    return descriptions
+
+    return descriptions
+
+
+def _attach_nl_descriptions(
+    rows: list[dict[str, Any]],
+    *,
+    benchmark: str,
+    variant: str,
+    run_dir: Path,
+) -> None:
+    missing_ids = [
+        row["id"]
+        for row in rows
+        if isinstance(row.get("id"), str) and not row.get("nl_description")
+    ]
+    if not missing_ids:
+        return
+
+    descriptions: dict[str, str] = {}
+    if benchmark in {"apps", "humaneval_plus"}:
+        descriptions.update(
+            _load_evalplus_nl_descriptions(benchmark, missing_ids, run_dir=run_dir)
+        )
+    elif benchmark == "defects4j":
+        if variant.startswith("nl2_"):
+            descriptions.update(_load_defects4j_nl2_run_descriptions(run_dir, missing_ids))
+            still_missing = [sample_id for sample_id in missing_ids if sample_id not in descriptions]
+        else:
+            still_missing = missing_ids
+        descriptions.update(_load_defects4j_dataset_descriptions(still_missing))
+
+    for row in rows:
+        if row.get("nl_description"):
+            continue
+        row["nl_description"] = descriptions.get(str(row.get("id", "")), "")
+
+
 class LLMCallRow(BaseModel):
     benchmark: str
     exp_name: str
@@ -1171,6 +1404,7 @@ def build_expecto_sample_rows(
                     benchmark, _sample_id_from_expecto_sample(sample)
                 ),
                 "classification": _category_label(category),
+                "nl_description": _extract_expecto_nl_description(sample, benchmark),
                 "postcondition": _extract_expecto_postcondition(sample),
             }
         )
@@ -1202,6 +1436,7 @@ def build_evalplus_nl2_sample_rows(
                         benchmark, entry.get("task_id", entry.get("id", ""))
                     ),
                     "classification": category,
+                    "nl_description": "",
                     "postcondition": str(entry.get("assertion", "")),
                 }
             )
@@ -1221,6 +1456,7 @@ def build_defects4j_nl2_sample_rows(
             {
                 "id": _normalize_exported_sample_id(benchmark, entry.get("id", "")),
                 "classification": category,
+                "nl_description": "",
                 "postcondition": str(entry.get("assertion", "")),
             }
         )
@@ -1250,6 +1486,12 @@ def export_target_sample_json(
             expecto_data, benchmark=benchmark, variant=variant
         )
 
+    _attach_nl_descriptions(
+        rows,
+        benchmark=benchmark,
+        variant=variant,
+        run_dir=run_dir,
+    )
     rows.sort(key=lambda row: row["id"])
     destination = output_path or (run_dir / "sample_results.json")
     destination.parent.mkdir(parents=True, exist_ok=True)
