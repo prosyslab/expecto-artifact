@@ -114,11 +114,11 @@ Generated outputs from the artifact runner are written under:
 ```text
 /workspace/data/experiment/artifact
 ├── full/                              <- Full paper reproduction outputs
-│   ├── runs/                          <- Raw experiment runs for each benchmark/variant
-│   │   ├── apps/                      <- APPS raw run directories
-│   │   ├── humaneval_plus/            <- HumanEval+ raw run directories
-│   │   └── defects4j/                 <- Defects4J raw run directories
-│   └── figures/                       <- Generated paper-facing tables and figures
+│   ├── runs/                          <- Raw experiment result data for each benchmark/variant
+│   │   ├── apps/                      <- APPS raw data directories
+│   │   ├── humaneval_plus/            <- HumanEval+ raw data directories
+│   │   └── defects4j/                 <- Defects4J raw data directories
+│   └── figures/                       <- Generated tables and figures
 │       ├── configs/                   <- Auto-generated figure configuration JSON files
 │       ├── rq1/                       <- RQ1 outputs
 │       ├── rq2/                       <- RQ2 outputs
@@ -137,35 +137,146 @@ Generated outputs from the artifact runner are written under:
 # 3. Reproducing only a specific `target_id`
 *You can skip this section if you want to directly reproduce the full paper results*
 
-This section explains how to generate results for a specific benchmark and generation algorithm on a particular problem.  
-It is useful when you want to compare the outputs for a specific problem or check if the generation settings are configured correctly.
+Use this mode when you want to run only a specific benchmark problem for a selected generation variant.
+This is helpful for:
 
-General rules:
+- comparing outputs for one problem
+- checking whether a generation setup is configured correctly
+- inspecting raw artifacts without running the full paper pipeline
 
+## Command
 - For `APPS` and `HumanEval+`, `target_id` is the numeric problem ID
 - For `Defects4J`, `target_id` is the full task ID string used in the dataset JSONL
-- You can pass multiple IDs as a comma-separated list if needed
+- You can pass multiple IDs as a comma-separated list
 - A full list of available IDs is provided in `datasets/available_target_ids.csv`
 
 ```bash
 python3 scripts/run_artifact.py target \
   --benchmark <apps|humaneval_plus|defects4j> \
-  --variant <mono|topdown|ts|without_tc|expecto|nl2_base|nl2_simple> \
+  --variant <mono|topdown|ts|without_tc|nl2_base|nl2_simple> \
   --sample-ids <id>
 ```
 
-What this command does:
+This command:
 
-- Reproduces only the requested `target_id` for the selected benchmark/variant
-- Does not generate paper-facing figures or tables automatically
+- reproduces only the requested `target_id` for the selected benchmark and variant
+- does not generate figures or tables automatically
+- runs are written to:
+  `/workspace/data/experiment/artifact/target/runs/<benchmark>/<variant>/`
+- result files to inspect:
+  - `Expecto` variants (`mono`, `topdown`, `ts`, `without_tc`): `evaluation_result/samples/<sample_id>.json`
+  - `NL2Postcond` variants (`nl2_base`, `nl2_simple`): `response_preprocess_outputs/.../evaluation_results.json`
 
-Example:
+## Example
+
 ```bash
 python3 scripts/run_artifact.py target \
   --benchmark apps \
   --variant ts \
-  --sample-ids 15,57
+  --sample-ids 15
 ```
+
+The results for this example will be written under:
+`/workspace/data/experiment/artifact/target/runs/apps/ts/`
+
+## Inspecting Expecto variants
+
+For `Expecto` variants (`mono`, `topdown`, `ts`, `without_tc`), start from the `evaluation_result/` directory:
+
+```bash
+find /workspace/data/experiment/artifact/target/runs/apps/ts/evaluation_result -maxdepth 2 -type f
+```
+
+Typical structure:
+
+- `evaluation_result/samples/<sample_id>.json`: per-target raw result
+
+`samples/15.json` looks like this:
+
+```json
+{
+  "sample_id": "15",
+  "final_output": {
+    "iteration": 2,
+    "num_of_nodes": 4,
+    "generated_codes": [
+      "predicate spec(a: int, b: int, c: int, output: string) { ... }"
+    ],
+    "is_success": true,
+    "num_of_defined": 2,
+    "num_of_undefined": 0
+  },
+  "metadata": {
+    "problem_id": 15,
+    "difficulty": "interview",
+    "input": "## Question: Vasya likes everything infinite. ...",
+    "signature": "def postcondition(a: int, b: int, c: int, output: str): ..."
+  },
+  "scores": [
+    [
+      {
+        "scorer_name": "dsl_completeness",
+        "score": "C",
+        "explanation": "{ \"C\": 30, \"I\": 0, \"TO\": 0 }"
+      }
+    ],
+    ...
+  ]
+}
+```
+
+Key fields:
+
+- `sample_id`: which target this file corresponds to
+- `final_output.iteration`, `final_output.num_of_nodes`: tree search statistics for this target
+- `final_output.generated_codes`: the generated formal specification
+- `final_output.is_success`: whether Expecto successfully finished the generation process for this target
+- `metadata.input`: the original natural-language problem statement
+- `metadata.signature`: the postcondition signature Expecto tried to satisfy
+- `scores`: evaluation results for each scoring criterion, including completeness and soundness, along with the raw explanation from the evaluation script
+
+## Inspecting NL2Postcond variants
+
+For `NL2Postcond` variants (`nl2_base`, `nl2_simple`), sample-level results are stored together in a single `evaluation_results.json` file:
+
+```bash
+find /workspace/data/experiment/artifact/target/runs/apps/nl2_base -name evaluation_results.json
+```
+
+A typical per-sample entry in `evaluation_results.json` looks like this:
+
+```json
+[
+  {
+        "task_id": "15",
+        "assertion": "...",
+        "is_complete": false,
+        "is_sound": false,
+        "complete_ratio": 0.0,
+        "sound_ratio": 0.0,
+        "true_cnt_correct": 178,
+        "false_cnt_correct": 0,
+        "error_cnt_correct": 0,
+        "true_cnt_mutated": 178,
+        "false_cnt_mutated": 0,
+        "error_cnt_mutated": 0,
+        "msg_completeness": "Success",
+        "msg_soundness": "Success"
+  },
+  ...
+]
+```
+
+Key fields:
+
+- `task_id`: which target this entry corresponds to
+- `assertion`: the generated postcondition assertion
+- `is_complete`: whether the assertion was complete on the evaluation set
+- `is_sound`: whether the assertion was sound on the evaluation set
+- `complete_ratio` / `sound_ratio`: the fraction of test cases that satisfied the completeness or soundness criterion
+- `true_cnt_correct` / `false_cnt_correct` / `error_cnt_correct`: counts of correct test cases that passed, failed, or errored on the generated assertion
+- `msg_completeness` / `msg_soundness`: the raw stdout/stderr message from the evaluation script for completeness and soundness
+
 
 # 4. Reproducing the full paper results
 
@@ -175,6 +286,20 @@ This command runs all the experiments required for the paper.
 ```bash
 python3 scripts/run_artifact.py full
 ```
+
+Where the results are stored:
+
+- Raw data:
+  - `/workspace/data/experiment/artifact/full/runs/apps/`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/`
+  - `/workspace/data/experiment/artifact/full/runs/defects4j/`
+- Final outputs (paper mapping):
+    - Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
+    - Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
+    - Fig. 9 (RQ2 generation algorithm ablation): `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
+    - Fig. 10 (RQ3 test-case ablation): `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
+    - Table 2 (RQ4 Defects4J comparison): `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
+
 By default, it will not run if an execution result already exists. You can force it to run again by using `--force`:
 
 ```bash
@@ -185,19 +310,6 @@ What this command does:
 
 - Runs all experiments required for reproducing paper results.
 - Generates all tables and figures after the runs finish.
-
-Where the results are stored:
-
-- Raw runs:
-  - `/workspace/data/experiment/artifact/full/runs/apps/`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/`
-  - `/workspace/data/experiment/artifact/full/runs/defects4j/`
-- Final outputs (paper mapping):
-    - `Table 1 (RQ1 main comparison)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
-    - `Fig. 8 (RQ1 threshold analysis)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
-    - `Fig. 9 (RQ2 generation algorithm ablation)`: `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
-    - `Fig. 10 (RQ3 test-case ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
-    - `Table 2 (RQ4 Defects4J comparison)`: `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
 Please refer to Section 4 for the claims that must be checked for each RQ.
 
@@ -220,19 +332,19 @@ Run `RQ1`:
 python3 scripts/run_artifact.py rq1
 ```
 
+Where the results are stored:
+
+- Raw data:
+  - `/workspace/data/experiment/artifact/full/runs/apps/{ts,nl2_base,nl2_simple}`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,nl2_base,nl2_simple}`
+- Outputs (paper mapping):
+    - Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
+    - Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
+
 What this command does:
 
 - Runs six raw experiment units: `apps/ts`, `apps/nl2_base`, `apps/nl2_simple`, `humaneval_plus/ts`, `humaneval_plus/nl2_base`, and `humaneval_plus/nl2_simple`
 - Uses `ts` as the full Expecto configuration and compares it against NL2Postcond `Base` and `Simple`
-
-Where the results are stored:
-
-- Raw runs:
-  - `/workspace/data/experiment/artifact/full/runs/apps/{ts,nl2_base,nl2_simple}`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,nl2_base,nl2_simple}`
-- Outputs (paper mapping):
-    - `Table 1 (RQ1 main comparison)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
-    - `Fig. 8 (RQ1 threshold analysis)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
 
 How this maps to the paper:
 
@@ -248,18 +360,18 @@ Run `RQ2`:
 python3 scripts/run_artifact.py rq2
 ```
 
+Where the results are stored:
+
+- Raw data:
+  - `/workspace/data/experiment/artifact/full/runs/apps/{mono,topdown,ts}`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{mono,topdown,ts}`
+- Outputs (paper mapping):
+    - Fig. 9 (RQ2 generation algorithm ablation): `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
+
 What this command does:
 
 - Runs six raw Expecto ablation units: `apps/mono`, `apps/topdown`, `apps/ts`, `humaneval_plus/mono`, `humaneval_plus/topdown`, and `humaneval_plus/ts`
 - Compares the monolithic baseline (`mono`), top-down without tree search (`topdown`), and full tree-search configuration (`ts`)
-
-Where the results are stored:
-
-- Raw runs:
-  - `/workspace/data/experiment/artifact/full/runs/apps/{mono,topdown,ts}`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{mono,topdown,ts}`
-- Outputs (paper mapping):
-    - `Fig. 9 (RQ2 generation algorithm ablation)`: `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
 
 How this maps to the paper:
 
@@ -275,18 +387,18 @@ Run `RQ3`:
 python3 scripts/run_artifact.py rq3
 ```
 
+Where the results are stored:
+
+- Raw data:
+  - `/workspace/data/experiment/artifact/full/runs/apps/{ts,without_tc}`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,without_tc}`
+- Outputs (paper mapping):
+    - Fig. 10 (RQ3 test-case ablation): `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
+
 What this command does:
 
 - Runs four raw Expecto validation-ablation units: `apps/ts`, `apps/without_tc`, `humaneval_plus/ts`, and `humaneval_plus/without_tc`
 - Uses the figure/config labels `With TC` and `Without TC`
-
-Where the results are stored:
-
-- Raw runs:
-  - `/workspace/data/experiment/artifact/full/runs/apps/{ts,without_tc}`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,without_tc}`
-- Outputs (paper mapping):
-    - `Fig. 10 (RQ3 test-case ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
 
 How this maps to the paper:
 
@@ -302,17 +414,17 @@ Run `RQ4`:
 python3 scripts/run_artifact.py rq4
 ```
 
-What this command does:
-
-- Runs three Defects4J raw experiment units: `defects4j/expecto`, `defects4j/nl2_base`, and `defects4j/nl2_simple`
-- Compares Expecto against the two NL2Postcond baselines on the real-world bug benchmark
-
 Where the results are stored:
 
-- Raw runs:
-  - `/workspace/data/experiment/artifact/full/runs/defects4j/{expecto,nl2_base,nl2_simple}`
+- Raw data:
+  - `/workspace/data/experiment/artifact/full/runs/defects4j/{ts,nl2_base,nl2_simple}`
 - Output (paper mapping):
-    - `Table 2 (RQ4 Defects4J comparison)`: `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
+    - Table 2 (RQ4 Defects4J comparison): `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
+
+What this command does:
+
+- Runs three Defects4J raw experiment units: `defects4j/ts`, `defects4j/nl2_base`, and `defects4j/nl2_simple`
+- Compares Expecto against the two NL2Postcond baselines on the real-world bug benchmark
 
 How this maps to the paper:
 
@@ -328,10 +440,23 @@ Run RQ1-RQ4 with a reduced fixed-sample profile:
 python3 scripts/run_artifact.py mini
 ```
 
+Where the results are stored:
+
+- Raw reduced runs:
+  - `/workspace/data/experiment/artifact/mini/runs/...`
+- Reduced outputs:
+  - `/workspace/data/experiment/artifact/mini/figures/rq1/` through `rq4/`
+
 Run a specific RQ with a reduced fixed-sample profile:
 ```bash
 python3 scripts/run_artifact.py <RQ_NUMBER> --mini
 ```
+
+Where the results are stored:
+
+- For a specific reduced RQ run:
+  - Raw data: `/workspace/data/experiment/artifact/mini/runs/...`
+  - Figures/tables: `/workspace/data/experiment/artifact/mini/figures/<RQ_NUMBER>/`
 
 What this command does:
 
@@ -344,12 +469,6 @@ Chart_6_workspace_objdump_d4j_full_fresh_chart_6_source_org_jfree_chart_util_Sha
 ```
 - Generates reduced outputs for `RQ1`-`RQ4`
 - Writes everything under `/workspace/data/experiment/artifact/mini`
-
-Where the results are stored:
-
-- Raw reduced runs:
-  - `/workspace/data/experiment/artifact/mini/runs/...`
-- Reduced outputs: `/workspace/data/experiment/artifact/mini/figures/rq1/` through `rq4/`
 
 How this maps to the paper:
 
