@@ -6,7 +6,7 @@ The paper studies the following four research questions:
 
 - `RQ1` How effective is Expecto in generating formal specifications from informal descriptions?
 - `RQ2` How do the top-down specification synthesis and tree search contribute to the performance of Expecto?
-- `RQ3` How do test cases and SMT-based validation contribute to the performance of Expecto?
+- `RQ3` How do test cases contribute to the performance of Expecto?
 - `RQ4` Can Expecto be practically applied to detect functional bugs in real-world software?
 
 The artifact execution script is `./scripts/run_artifact.py`.
@@ -164,7 +164,7 @@ Where the results are stored:
     - `Table 1 (RQ1 main comparison)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
     - `Fig. 8 (RQ1 threshold analysis)`: `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
     - `Fig. 9 (RQ2 generation algorithm ablation)`: `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
-    - `Fig. 10 (RQ3 test-case and SMT-based validation ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
+    - `Fig. 10 (RQ3 test-case ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
     - `Table 2 (RQ4 Defects4J comparison)`: `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
 Please refer to Section 4 for the claims that must be checked for each RQ.
@@ -240,7 +240,7 @@ What to check:
 
 - `evaluation.rq2.pdf` is the paper-facing visualization for `Fig. 9`
 
-## RQ3. Impact of Test Cases and SMT-Based Validation on Specification Generation
+## RQ3. Impact of Test Cases on Specification Generation
 Run `RQ3`:
 
 ```bash
@@ -249,24 +249,23 @@ python3 scripts/run_artifact.py rq3
 
 What this command does:
 
-- Runs six raw Expecto validation-ablation units: `apps/ts`, `apps/without_tc`, `apps/without_smt`, `humaneval_plus/ts`, `humaneval_plus/without_tc`, and `humaneval_plus/without_smt`
-- Uses the figure/config labels `ts`, `without_tc`, and `without_smt`
+- Runs four raw Expecto validation-ablation units: `apps/ts`, `apps/without_tc`, `humaneval_plus/ts`, and `humaneval_plus/without_tc`
+- Uses the figure/config labels `With TC` and `Without TC`
 
 Where the results are stored:
 
 - Raw runs:
-  - `/workspace/data/experiment/artifact/full/runs/apps/{ts,without_tc,without_smt}`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,without_tc,without_smt}`
+  - `/workspace/data/experiment/artifact/full/runs/apps/{ts,without_tc}`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,without_tc}`
 - Outputs (paper mapping):
-    - `Fig. 10 (RQ3 test-case and SMT-based validation ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
+    - `Fig. 10 (RQ3 test-case ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
 
 How this maps to the paper:
 
 - Paper section: `§4.4`
 - Figure coverage: `Fig. 10`
-- Methodology: `Without SMT` and `Without TC` ablations isolate the SMT-based validation logic and test case usage in validation step in `§3.4`
 - Benchmarks: `HumanEval+` and `APPS`
-- Claim being checked: test cases and SMT-based validation improve robustness of specification generation
+- Claim being checked: test cases improve robustness of specification generation
 
 ## RQ4. Effectiveness of Expecto for bug detection in real-world software
 Run `RQ4`:
@@ -329,7 +328,7 @@ Run one benchmark-specific target:
 
 ```bash
 python3 scripts/run_artifact.py target --benchmark apps --family rq2 --variant topdown
-python3 scripts/run_artifact.py target --benchmark humaneval_plus --family rq3 --variant without_smt
+python3 scripts/run_artifact.py target --benchmark humaneval_plus --family rq3 --variant without_tc
 python3 scripts/run_artifact.py target --benchmark defects4j --family rq4 --variant nl2_base
 ```
 
@@ -371,11 +370,11 @@ For `HumanEval+`, run:
 python3 scripts/run_artifact.py target \
   --benchmark humaneval_plus \
   --family rq3 \
-  --variant without_smt \
+  --variant without_tc \
   --sample-ids 123
 ```
 
-This example reproduces only HumanEval+ problem `123` for the `rq3/without_smt` target.
+This example reproduces only HumanEval+ problem `123` for the `rq3/without_tc` target.
 
 For `Defects4J`, run:
 

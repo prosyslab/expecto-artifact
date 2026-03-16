@@ -196,10 +196,6 @@ class BenchmarkRunDirs(BaseModel):
         default=None,
         validation_alias=AliasChoices("without_tc", "ts_no_tc"),
     )
-    without_smt: DirectoryPath | None = Field(
-        default=None,
-        validation_alias=AliasChoices("without_smt", "no_unsat_check"),
-    )
     nl2_postcond_base: DirectoryPath | None = Field(
         default=None,
         validation_alias=AliasChoices(
@@ -221,7 +217,6 @@ class BenchmarkRunDirs(BaseModel):
             ("topdown", self.topdown),
             ("ts", self.ts),
             ("without_tc", self.without_tc),
-            ("without_smt", self.without_smt),
         ]
         return [(name, path) for name, path in runs if path is not None]
 
@@ -255,7 +250,6 @@ EXPECTO_RUN_LABELS: dict[str, str] = {
     "topdown": "TopDown",
     "ts": "TreeSearch",
     "without_tc": "without_tc",
-    "without_smt": "without_smt",
 }
 BASELINE_NL2_RUNS: tuple[tuple[str, str], ...] = (
     ("nl2_postcond_base", "Base"),
@@ -1851,31 +1845,15 @@ def draw_rq3_fig(json_path: str, output_path: str):
     config = _load_figure_run_config(json_path)
     testcase_ablation_datas: list[AggregatedResult] = []
     testcase_by_benchmark: dict[str, list[AggregatedResult]] = defaultdict(list)
-    has_no_unsat_ablation = False
     output_dir = Path(output_path)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for benchmark, benchmark_config in config.items():
         ts_path = _require_expecto_run(benchmark_config, benchmark, "ts")
         without_tc_path = _require_expecto_run(benchmark_config, benchmark, "without_tc")
-        without_smt_path = benchmark_config.without_smt
-
-        paths = [ts_path, without_tc_path]
-        if without_smt_path is not None:
-            paths.append(without_smt_path)
-
-        results = read_expecto(paths)
-        ts_data, without_tc_data = results[:2]
-        without_smt_data: EvaluationResult | None = None
-        if without_smt_path is not None and len(results) > 2:
-            without_smt_data = results[2]
+        ts_data, without_tc_data = read_expecto([ts_path, without_tc_path])
 
         testcase_results = [parse_expecto_data(without_tc_data, benchmark, "Without TC")]
-        if without_smt_data is not None:
-            has_no_unsat_ablation = True
-            testcase_results.append(
-                parse_expecto_data(without_smt_data, benchmark, "Without SMT")
-            )
         testcase_results.append(parse_expecto_data(ts_data, benchmark, "With TC"))
         testcase_ablation_datas.extend(testcase_results)
         testcase_by_benchmark[benchmark].extend(testcase_results)
@@ -1894,18 +1872,13 @@ def draw_rq3_fig(json_path: str, output_path: str):
 
     testcase_pdf_path = output_dir / "evaluation.rq3.testcase.pdf"
     testcase_colors: dict[str, str] = {
-        "Without SMT": COLOR_WRONG,
-        "Without TC": COLOR_COMPLETE_ONLY,
-        "TreeSearch": COLOR_SOUND_AND_COMPLETE,
+        "Without TC": COLOR_WRONG,
+        "With TC": COLOR_SOUND_AND_COMPLETE,
     }
-    testcase_exp_order: list[str] = []
-    if has_no_unsat_ablation:
-        testcase_exp_order.append("Without SMT")
-    testcase_exp_order.extend(["Without TC", "TreeSearch"])
     draw_ablation_subplots(
         testcase_by_benchmark,
         testcase_pdf_path,
-        exp_order=tuple(testcase_exp_order),
+        exp_order=("Without TC", "With TC"),
         exp_color_map=testcase_colors,
     )
 

@@ -52,7 +52,6 @@ def run_humaneval_plus_with_nl2postcond(
 @click.option("--threshold", type=float, default=0.5, help="The threshold to use for the merger")
 @click.option("--use_test_cases", type=bool, default=False, help="Whether to use test cases", is_flag=True)
 @click.option("--use_memo", type=bool, default=False, help="Whether to use memo", is_flag=True)
-@click.option("--check_unsat/--no_check_unsat", default=True, help="Whether to check unsatisfiability when no test cases are available")
 @click.option("--validation-sampling-mode", type=click.Choice(["all", "deterministic_cap"]), default="all", show_default=True, help="Validation test sampling mode.")
 @click.option("--validation-positive-cap", type=click.IntRange(min=1), default=None, help="Maximum number of positive validation test cases.")
 @click.option("--validation-negative-cap", type=click.IntRange(min=1), default=None, help="Maximum number of negative validation test cases.")
@@ -72,7 +71,6 @@ def run(
     threshold,
     use_test_cases,
     use_memo,
-    check_unsat,
     validation_sampling_mode,
     validation_positive_cap,
     validation_negative_cap,
@@ -93,7 +91,7 @@ def run(
             threshold=threshold,
             use_test_cases=use_test_cases,
             use_memo=use_memo,
-            check_unsat=check_unsat,
+            check_unsat=True,
         )
         run_humaneval_plus_with_nl2postcond(
             exp_name=exp_name,
@@ -150,8 +148,6 @@ def run(
         args.append("--use_test_cases")
     if use_memo:
         args.append("--use_memo")
-    if not check_unsat:
-        args.append("--no_check_unsat")
     if validation_positive_cap is not None:
         args.extend(["--validation-positive-cap", str(validation_positive_cap)])
     if validation_negative_cap is not None:

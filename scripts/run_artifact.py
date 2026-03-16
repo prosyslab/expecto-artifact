@@ -111,7 +111,6 @@ class ExpectoVariant:
     max_attempts: int = 3
     use_test_cases: bool = True
     use_memo: bool = True
-    check_unsat: bool = True
     dsl: bool = True
 
 
@@ -183,19 +182,12 @@ EXPECTO_VARIANTS = {
         use_test_cases=False,
         use_memo=True,
     ),
-    "without_smt": ExpectoVariant(
-        solver="tree_search",
-        n_completions=3,
-        use_test_cases=False,
-        use_memo=True,
-        check_unsat=False,
-    ),
 }
 
 RQ_TARGET_VARIANTS = {
     "rq1": {"ts", "nl2_base", "nl2_simple"},
     "rq2": {"mono", "topdown", "ts"},
-    "rq3": {"ts", "without_tc", "without_smt"},
+    "rq3": {"ts", "without_tc"},
     "rq4": {"expecto", "nl2_base", "nl2_simple"},
 }
 
@@ -251,7 +243,6 @@ def _resolve_expecto_variant(
         ),
         use_test_cases=variant.use_test_cases,
         use_memo=variant.use_memo,
-        check_unsat=variant.check_unsat,
         dsl=variant.dsl,
     )
 
@@ -330,8 +321,6 @@ def _build_expecto_evalplus_command(
         args.append("--use_test_cases")
     if variant.use_memo:
         args.append("--use_memo")
-    if not variant.check_unsat:
-        args.append("--no_check_unsat")
     serialized_sample_ids = _serialize_sample_ids(sample_ids)
     if serialized_sample_ids is not None:
         args.extend(["--sample-ids", serialized_sample_ids])
@@ -647,9 +636,6 @@ def build_rq_units(
                     _make_evalplus_expecto_unit(
                         layout, benchmark, "without_tc", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
                     ),
-                    _make_evalplus_expecto_unit(
-                        layout, benchmark, "without_smt", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
-                    ),
                 ]
             )
     elif rq == "rq4":
@@ -860,7 +846,6 @@ def _build_rq3_figure_config(layout: ArtifactLayout) -> dict[str, dict[str, str]
         {
             "ts": "ts",
             "without_tc": "without_tc",
-            "without_smt": "without_smt",
         },
     )
 
@@ -1200,7 +1185,6 @@ def mini(
             "topdown",
             "ts",
             "without_tc",
-            "without_smt",
             "expecto",
             "nl2_base",
             "nl2_simple",
