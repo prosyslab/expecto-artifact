@@ -1246,7 +1246,6 @@ def mini(
 )
 def target(
     benchmark: str,
-    family: str | None,
     variant: str,
     output_root: Path,
     limit: int | None,
@@ -1265,7 +1264,7 @@ def target(
     unit = build_target_unit(
         layout,
         benchmark=benchmark,
-        family=family,
+        family=None,
         variant=variant,
         limit=limit,
         sample_ids=parsed_sample_ids,

@@ -135,6 +135,8 @@ Generated outputs from the artifact runner are written under:
 ```
 
 # 3. Reproducing only a specific `target_id`
+*You can skip this section if you want to directly reproduce the full paper results*
+
 This section explains how to generate results for a specific benchmark and generation algorithm on a particular problem.  
 It is useful when you want to compare the outputs for a specific problem or check if the generation settings are configured correctly.
 
@@ -155,6 +157,14 @@ What this command does:
 
 - Reproduces only the requested `target_id` for the selected benchmark/variant
 - Does not generate paper-facing figures or tables automatically
+
+Example:
+```bash
+python3 scripts/run_artifact.py target \
+  --benchmark apps \
+  --variant ts \
+  --sample-ids 15,57
+```
 
 # 4. Reproducing the full paper results
 
