@@ -2,19 +2,10 @@
 
 This repository contains the artifact implementation for the paper *Expecto: Extracting Formal Specifications from Natural Language Description for Trustworthy Oracles*.
 
-The paper studies the following four research questions:
-
-- `RQ1` How effective is Expecto in generating formal specifications from informal descriptions?
-- `RQ2` How do the top-down specification synthesis and tree search contribute to the performance of Expecto?
-- `RQ3` How do test cases contribute to the performance of Expecto?
-- `RQ4` Can Expecto be practically applied to detect functional bugs in real-world software?
-
-The artifact execution script is `./scripts/run_artifact.py`.
-
 # 1. Getting started
 
 ## System requirements
-In the paper, the experiments were conducted with:
+The experiments in the paper were conducted with the following setup:
 
 - Ubuntu 22.04
 - Docker 24.0.2
@@ -26,6 +17,7 @@ In the paper, the experiments were conducted with:
 
 ### Step 1. Pull or load the Docker image
 
+First, obtain the Docker image that includes the datasets, dependencies, and experiment codes.
 Pulling the image is the easiest option.
 
 ```bash
@@ -38,7 +30,7 @@ If you downloaded `expecto-artifact.tar.gz` from Zenodo, you can load it instead
 gunzip -c expecto-artifact.tar.gz | docker load
 ```
 
-You can check that the image is well pulled or loaded with:
+You can verify that the image was pulled or loaded correctly with:
 ```bash
 docker images | grep expecto-artifact
 > prosyslab/expecto-artifact   latest    ...
@@ -52,37 +44,26 @@ docker run -it --name expecto-artifact prosyslab/expecto-artifact zsh
 
 ### Step 3. Create the `.env` file
 
-Inside the container, move to `/workspace/expecto-artifact` and create a `.env` file with your OpenAI API key.
+Inside the container, move to `/workspace/expecto-artifact` and create a `.env` file containing your OpenAI API key.
 
 ```bash
+cd /workspace/expecto-artifact
 cat > .env <<'EOF'
 OPENAI_API_KEY=YOUR_KEY_HERE
 EOF
 ```
 
-### Step 4. Run the test
+### Step 4. Check the setup with the test script (~2 minutes)
 
-This is quick test run (takes 2 minutes). It checks your environment and runs a very small `RQ1` reproduction.
+The following script checks whether the setup has been completed successfully.
+In particular, make sure that all items in the `Summary` section are marked as `[PASS]`.
 
+Command:
 ```bash
 python3 scripts/test.py
 ```
 
-This script checks the creation, evaluation, and figure generation process for RQ1.
-If the output appears as shown below, this confirms that all settings have been configured correctly.
-
 Expected output:
-- The script checks the environment and runs a small RQ1 smoke test.
-- Raw data:
-  - `/workspace/data/experiment/artifact/test-smoke/full/runs/apps/`
-  - `/workspace/data/experiment/artifact/test-smoke/full/runs/humaneval_plus/`
-- Outputs:
-  - `/workspace/data/experiment/artifact/test-smoke/full/figures/rq1/evaluation.rq1.table.tex`
-  - `/workspace/data/experiment/artifact/test-smoke/full/figures/rq1/evaluation.rq1.table.pdf`
-  - `/workspace/data/experiment/artifact/test-smoke/full/figures/rq1/evaluation.thresholds.pdf`
-
-A successful console log looks like this:
-
 ```text
 [PASS] .env file: /workspace/expecto-artifact/.env
 [PASS] OPENAI_API_KEY: OPENAI_API_KEY is defined in .env and starts with 'sk-'
@@ -109,81 +90,72 @@ Summary:
 [PASS] RQ1 figure outputs
 ```
 
+This test script checks the following:
+1. Required datasets exist
+2. `OPENAI_API_KEY` is set
+3. The RQ1 experiment from the paper can be executed for a single sample, and the final figure files are generated correctly
+*Note: the figures generated here are not intended to reproduce the exact values reported in the paper. They are meant to verify that the execution process works correctly before you begin the full reproduction.*
+
 # 2. Directory structure
-
-This section shows the most important top-level directories.
-
+expecto-artifact has the following directory structure:
 ```text
 /workspace/expecto-artifact
 ├── README.md                          <- The top-level README (this file)
 ├── analyzer/                          <- Figure and table generation scripts
 ├── datasets/                          <- HumanEval+, APPS, and Defects4J datasets
 ├── expecto/                           <- Core Expecto implementation
-├── nl-2-postcond/                     <- NL2Postcond baseline implementation
-└── scripts/                           <- Benchmark wrappers and artifact entrypoint
-    ├── run_artifact.py                <- Main artifact runner
-    ├── run_humaneval_plus.py          <- HumanEval+ benchmark runner
-    ├── run_apps.py                    <- APPS benchmark runner
-    ├── run_defects4j.py               <- Defects4J runner for Expecto
-    ├── run_nl2postcond.py             <- Shared NL2Postcond wrapper
-    └── run_defects4j_nl2postcond.py   <- Defects4J NL2Postcond wrapper
+├── nl-2-postcond/                     <- NL2Postcond baseline from FSE '24
+└── scripts/                           <- Scripts for running artifact experiments
+    └── run_artifact.py                <- Main artifact runner
 ```
 
 Generated outputs from the artifact runner are written under:
-
 ```text
 /workspace/data/experiment/artifact
-├── full/                              <- Full paper reproduction outputs
-│   ├── runs/                          <- Raw experiment result data for each benchmark/variant
-│   │   ├── apps/                      <- APPS raw data directories
-│   │   ├── humaneval_plus/            <- HumanEval+ raw data directories
-│   │   └── defects4j/                 <- Defects4J raw data directories
-│   └── figures/                       <- Generated tables and figures
-│       ├── configs/                   <- Auto-generated figure configuration JSON files
-│       ├── rq1/                       <- RQ1 outputs
-│       ├── rq2/                       <- RQ2 outputs
-│       ├── rq3/                       <- RQ3 outputs
-│       └── rq4/                       <- RQ4 outputs
-├── mini/                              <- Reduced fixed-sample profile outputs
+├── target/                            <- Outputs for targeted reproduction (See Section 3 of this README)
+│   └── runs/                          <- Raw LLM outputs and raw evaluation results by benchmark and configuration
+│       ├── apps/                      <- APPS outputs
+│       ├── humaneval_plus/            <- HumanEval+ outputs
+│       └── defects4j/                 <- Defects4J outputs
+├── full/                              <- Outputs for full paper reproduction (See Sections 4 and 5 of this README)
+│   ├── runs/                          <- Raw LLM outputs and raw evaluation results by benchmark and configuration
+│   └── figures/                       <- Generated tables and figures used in the paper
+│       ├── rq1/                       <- Figures for RQ1
+│       ├── rq2/                       <- Figures for RQ2
+│       ├── rq3/                       <- Figures for RQ3
+│       └── rq4/                       <- Figures for RQ4
+├── mini/                              <- Outputs for reduced mini benchmarks (See Section 6 of this README)
 │   ├── runs/
 │   └── figures/
-└── target/                            <- Targeted reproduction outputs
-    └── runs/
-        ├── apps/
-        ├── humaneval_plus/
-        └── defects4j/
 ```
 
-# 3. Reproducing only a specific `target_id`
-*You can skip this section if you want to directly reproduce the full paper results*
-
-Use this mode when you want to run only a specific benchmark problem for a selected generation variant.
-This is helpful for:
-
-- comparing outputs for one problem
-- checking whether a generation setup is configured correctly
-- inspecting raw artifacts before running the full paper pipeline
-
-## Command
-- For `APPS` and `HumanEval+`, `target_id` is the numeric problem ID
-- For `Defects4J`, `target_id` is the full task ID string used in the dataset JSONL
-- You can pass multiple IDs as a comma-separated list
-- A full list of available IDs is provided in `datasets/available_target_ids.csv`
+# 3. Reproducing specific benchmark problems
+This section explains how to generate and evaluate a specific benchmark problem with a specific configuration.
+In the paper, we used three different benchmarks, four Expecto variant configurations, and two NL2Postcond variant configurations.
+This section describes how to run each benchmark by specifying the problem ID for any of the 3 x (4 + 2) = 18 combinations.
 
 ```bash
 python3 scripts/run_artifact.py target \
-  --benchmark <apps|humaneval_plus|defects4j> \
-  --variant <mono|topdown|ts|without_tc|nl2_base|nl2_simple> \
-  --sample-ids <id>
+  --benchmark <BENCHMARK> \
+  --variant <VARIANT> \
+  --sample-ids <SAMPLE-IDS>
 ```
 
-Expected output:
-- The command runs only the requested `target_id` values for the selected benchmark and variant.
-- Raw data:
-  - `/workspace/data/experiment/artifact/target/runs/<benchmark>/<variant>/`
-- Outputs:
-  - `Expecto` variants (`mono`, `topdown`, `ts`, `without_tc`): `evaluation_result/samples/<sample_id>.json`
-  - `NL2Postcond` variants (`nl2_base`, `nl2_simple`): `response_preprocess_outputs/.../evaluation_results.json`
+- `BENCHMARK` specifies which benchmark to generate. You can choose one of `apps`, `humaneval_plus`, or `defects4j`.
+- `VARIANT` specifies the Expecto or NL2Postcond configuration used in the paper.
+  - For Expecto, the following four configurations are available:
+    1. `mono`: the monolithic synthesis without top-down decomposition or tree search (Section 4.3 in the paper)
+    2. `topdown`: the top-down synthesis without tree search (Section 4.3 in the paper)
+    3. `ts`: the top-down synthesis with tree search (Sections 4.2, 4.3, 4.4, and 4.5 in the paper)
+    4. `without_tc`: the top-down tree-search synthesis without test cases (Section 4.4 in the paper)
+  - For NL2Postcond, the following two configurations are available:
+    1. `nl2_base`: the NL2Postcond base prompt strategy (Sections 4.2 and 4.5 in the paper)
+    2. `nl2_simple`: the NL2Postcond simple prompt strategy (Sections 4.2 and 4.5 in the paper)
+- `SAMPLE-IDS` specifies the IDs of the benchmark problems to generate as a comma-separated list. For example, you can provide `15,23,56`.
+  You can find the list of available problem IDs for each benchmark in `/workspace/expecto-artifact/datasets/available_target_ids.csv`.
+
+여기서 생성하는 것은 LLM의 raw output과 테스트 케이스를 활용한 soundness 및 completeness 평가 결과입니다.
+생성물과 평가 평가 결과는 다음 경로에 저장됩니다: `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<VARIANT>`
 
 ## Example
 
