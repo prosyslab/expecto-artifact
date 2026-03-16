@@ -116,8 +116,6 @@ def _run_rq1_smoke(output_root: Path) -> bool:
     command = [
         sys.executable,
         str(PROJECT_ROOT / "scripts" / "run_artifact.py"),
-        "rq",
-        "--rq",
         "rq1",
         "--limit",
         "1",
