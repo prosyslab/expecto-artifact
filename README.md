@@ -92,7 +92,7 @@ Summary:
 [PASS] RQ1 figure outputs
 ```
 
----
+
 # 2. Directory structure
 ```text
 ├── README.md                          <- The top-level README (this file)
@@ -134,8 +134,29 @@ Generated outputs from the artifact runner are written under:
         └── defects4j/
 ```
 
----
-# 3. Full reproduction
+# 3. Reproducing only a specific `target_id`
+This section explains how to generate results for a specific benchmark and generation algorithm on a particular problem.  
+It is useful when you want to compare the outputs for a specific problem or check if the generation settings are configured correctly.
+
+General rules:
+
+- For `APPS` and `HumanEval+`, `target_id` is the numeric problem ID
+- For `Defects4J`, `target_id` is the full task ID string used in the dataset JSONL
+- You can pass multiple IDs as a comma-separated list if needed
+
+```bash
+python3 scripts/run_artifact.py target \
+  --benchmark <apps|humaneval_plus|defects4j> \
+  --variant <mono|topdown|ts|without_tc|expecto|nl2_base|nl2_simple> \
+  --sample-ids <id>
+```
+
+What this command does:
+
+- Reproduces only the requested `target_id` for the selected benchmark/variant
+- Does not generate paper-facing figures or tables automatically
+
+# 4. Reproducing the full paper results
 
 This command runs all the experiments required for the paper.
 **Expected runtime for `full`: about 50 hours.**
@@ -169,8 +190,8 @@ Where the results are stored:
 
 Please refer to Section 4 for the claims that must be checked for each RQ.
 
----
-# 4. RQ reproduction
+
+# 5. Reproducing specific RQs
 Use `rq1`, `rq2`, `rq3`, or `rq4` when you want one paper result and its associated outputs without running the full artifact.
 
 > **Note:** If you have already completed the `full` run, all figures and tables for the paper will have been generated. There is no need to run `rq1`-`rq4` separately unless you want to rerun or inspect a specific research question in detail.
@@ -235,10 +256,6 @@ How this maps to the paper:
 - Figure coverage: `Fig. 9`
 - Benchmarks: `HumanEval+` and `APPS`
 - Claim being checked: the top-down decomposition reduces wrong specifications and tree search increases sound-and-complete (S&C) specifications
-
-What to check:
-
-- `evaluation.rq2.pdf` is the paper-facing visualization for `Fig. 9`
 
 ## RQ3. Impact of Test Cases on Specification Generation
 Run `RQ3`:
@@ -321,75 +338,3 @@ Where the results are stored:
 How this maps to the paper:
 
 - `mini` is not meant to reproduce the exact paper numbers. It is only reproducing the paper's overall trend.
-
----
-# 5. Target reproduction
-Run one benchmark-specific target:
-
-```bash
-python3 scripts/run_artifact.py target --benchmark apps --family rq2 --variant topdown
-python3 scripts/run_artifact.py target --benchmark humaneval_plus --family rq3 --variant without_tc
-python3 scripts/run_artifact.py target --benchmark defects4j --family rq4 --variant nl2_base
-```
-
-What this command does:
-
-- Runs exactly one raw experiment unit and does not generate paper-facing figures or tables
-- Lets you inspect one component of a larger RQ result or rerun only the unit that failed
-
-Where the results are stored:
-
-- `apps` and `humaneval_plus` targets: `/workspace/data/experiment/artifact/target/runs/<benchmark>/<variant>`
-- `defects4j` targets: `/workspace/data/experiment/artifact/target/runs/defects4j/<variant>`
-
----
-# 6. Reproducing only a specific `target_id`
-If you want to reproduce exactly one benchmark instance instead of the default sweep, use `run_artifact.py target` with `--sample-ids`. This mode only reruns the requested raw target and does not generate paper-facing figures or tables.
-
-General rules:
-
-- For `APPS` and `HumanEval+`, `target_id` is the numeric problem ID
-- For `Defects4J`, `target_id` is the full task ID string used in the dataset JSONL
-- You can pass multiple IDs as a comma-separated list if needed
-
-```bash
-python3 scripts/run_artifact.py target \
-  --benchmark apps \
-  --family rq2 \
-  --variant topdown \
-  --sample-ids 3701
-```
-
-This example reproduces only APPS problem `3701` for the `rq2/topdown` target, and writes the result to:
-
-- `/workspace/data/experiment/artifact/target/runs/apps/topdown`
-
-For `HumanEval+`, run:
-
-```bash
-python3 scripts/run_artifact.py target \
-  --benchmark humaneval_plus \
-  --family rq3 \
-  --variant without_tc \
-  --sample-ids 123
-```
-
-This example reproduces only HumanEval+ problem `123` for the `rq3/without_tc` target.
-
-For `Defects4J`, run:
-
-```bash
-python3 scripts/run_artifact.py target \
-  --benchmark defects4j \
-  --family rq4 \
-  --variant nl2_base \
-  --sample-ids "Chart_6_workspace_objdump_d4j_full_fresh_chart_6_source_org_jfree_chart_util_ShapeList_java_boolean_equals_Object_obj"
-```
-
-What this command does:
-
-- Reproduces only the requested `target_id` for the selected benchmark/variant
-- Preserves the same output directory layout used by Section 5 target runs
-- Does not generate paper-facing figures or tables automatically
-
-If you want the corresponding paper figure or table after reproducing a specific `target_id`, rerun the appropriate `rq1`, `rq2`, `rq3`, or `rq4` command once the needed raw runs are available.

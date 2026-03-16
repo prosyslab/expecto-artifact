@@ -190,6 +190,15 @@ RQ_TARGET_VARIANTS = {
     "rq3": {"ts", "without_tc"},
     "rq4": {"expecto", "nl2_base", "nl2_simple"},
 }
+TARGET_VARIANT_DEFAULT_FAMILY = {
+    "mono": "rq2",
+    "topdown": "rq2",
+    "ts": "rq1",
+    "without_tc": "rq3",
+    "expecto": "rq4",
+    "nl2_base": "rq1",
+    "nl2_simple": "rq1",
+}
 
 
 def _click_path(path: Path) -> str:
@@ -690,17 +699,38 @@ def build_target_unit(
     layout: ArtifactLayout,
     *,
     benchmark: str,
-    family: str,
+    family: str | None,
     variant: str,
     limit: int | None = None,
     sample_ids: Sequence[str] | None = None,
 ) -> ExperimentUnit:
-    if family not in RQ_CHOICES:
-        raise click.ClickException(f"Unsupported family: {family}")
-    if variant not in RQ_TARGET_VARIANTS[family]:
-        raise click.ClickException(
-            f"Variant '{variant}' is not valid for family '{family}'"
+    supported_families = [
+        rq
+        for rq in RQ_CHOICES
+        if variant in RQ_TARGET_VARIANTS[rq]
+        and (
+            (rq == "rq4" and benchmark == "defects4j")
+            or (rq != "rq4" and benchmark in EVALPLUS_BENCHMARKS)
         )
+    ]
+    if not supported_families:
+        raise click.ClickException(
+            f"Variant '{variant}' is not supported for benchmark '{benchmark}'"
+        )
+
+    if family is None:
+        family = TARGET_VARIANT_DEFAULT_FAMILY[variant]
+        if family not in supported_families:
+            family = supported_families[0]
+    else:
+        if family not in RQ_CHOICES:
+            raise click.ClickException(f"Unsupported family: {family}")
+        if family not in supported_families:
+            valid_families = ", ".join(supported_families)
+            raise click.ClickException(
+                f"Variant '{variant}' is not valid for family '{family}' "
+                f"on benchmark '{benchmark}'. Valid family values: {valid_families}"
+            )
 
     if family == "rq4":
         if benchmark != "defects4j":
@@ -1172,12 +1202,6 @@ def mini(
     required=True,
 )
 @click.option(
-    "--family",
-    type=click.Choice(RQ_CHOICES),
-    required=True,
-    help="Target family/RQ the variant belongs to.",
-)
-@click.option(
     "--variant",
     type=click.Choice(
         (
@@ -1222,7 +1246,7 @@ def mini(
 )
 def target(
     benchmark: str,
-    family: str,
+    family: str | None,
     variant: str,
     output_root: Path,
     limit: int | None,
@@ -1246,7 +1270,7 @@ def target(
         limit=limit,
         sample_ids=parsed_sample_ids,
     )
-    execute_units([unit], force=true, dry_run=dry_run)
+    execute_units([unit], force=force, dry_run=dry_run)
 
 
 if __name__ == "__main__":
