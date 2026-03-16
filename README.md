@@ -17,7 +17,7 @@ The experiments in the paper were conducted with the following setup:
 
 ### Step 1. Pull or load the Docker image
 
-First, obtain the Docker image that includes the datasets, dependencies, and experiment codes.
+First, obtain the Docker image that includes the datasets, dependencies, and experiment code.
 Pulling the image is the easiest option.
 
 ```bash
@@ -30,7 +30,7 @@ If you downloaded `expecto-artifact.tar.gz` from Zenodo, you can load it instead
 gunzip -c expecto-artifact.tar.gz | docker load
 ```
 
-You can verify that the image was pulled or loaded correctly with:
+You can verify that the image was pulled or loaded correctly by running:
 ```bash
 docker images | grep expecto-artifact
 > prosyslab/expecto-artifact   latest    ...
@@ -44,7 +44,7 @@ docker run -it --name expecto-artifact prosyslab/expecto-artifact zsh
 
 ### Step 3. Create the `.env` file
 
-Inside the container, move to `/workspace/expecto-artifact` and create a `.env` file containing your OpenAI API key.
+Inside the container, change to `/workspace/expecto-artifact` and create a `.env` file with your OpenAI API key.
 
 ```bash
 cd /workspace/expecto-artifact
@@ -55,8 +55,8 @@ EOF
 
 ### Step 4. Check the setup with the test script (less than 2 minutes)
 
-The following script checks whether the setup has been completed successfully.
-In particular, make sure that all items in the `Summary` section are marked as `[PASS]`.
+Run the following script to confirm that the setup completed successfully.
+Make sure every item in the `Summary` section is marked as `[PASS]`.
 
 Command:
 ```bash
@@ -94,11 +94,12 @@ Summary:
 This test script checks the following:
 1. Required datasets exist
 2. `OPENAI_API_KEY` is set
-3. The RQ1 experiment from the paper can be executed for a single sample, and the final figure files are generated correctly
-*Note: the figures generated here are not intended to reproduce the exact values reported in the paper. They are meant to verify that the execution process works correctly before you begin the full reproduction.*
+3. The RQ1 experiment can run on a single sample, and the final figure files are generated correctly
+
+*Note: the figures generated here are not intended to reproduce the exact values reported in the paper. They only verify that the workflow runs correctly before you begin the full reproduction.*
 
 # 2. Directory structure
-expecto-artifact has the following directory structure:
+The `expecto-artifact` repository has the following directory structure:
 ```text
 /workspace/expecto-artifact
 ├── README.md                          <- The top-level README (this file)
@@ -113,45 +114,51 @@ expecto-artifact has the following directory structure:
 Generated outputs from the artifact runner are written under:
 ```text
 /workspace/data/experiment/artifact
-├── target/                            <- Outputs for targeted reproduction (See Section 3 of this README)
-│   └── runs/                          <- Raw LLM outputs and raw evaluation results by benchmark and configuration
+├── target/                            <- Outputs for targeted reproduction
+│   │                                      (See Section 3 of this README)
+│   └── runs/                          <- Raw LLM outputs and raw evaluation
+│       │                                  results by benchmark and configuration
 │       ├── apps/                      <- APPS outputs
 │       ├── humaneval_plus/            <- HumanEval+ outputs
 │       └── defects4j/                 <- Defects4J outputs
-├── full/                              <- Outputs for full paper reproduction (See Sections 4 and 5 of this README)
-│   ├── runs/                          <- Raw LLM outputs and raw evaluation results by benchmark and configuration
-│   └── figures/                       <- Generated tables and figures used in the paper
+├── full/                              <- Outputs for full paper reproduction
+│   │                                      (See Sections 4 and 5 of this README)
+│   ├── runs/                          <- Raw LLM outputs and raw evaluation
+│   │                                      results by benchmark and configuration
+│   └── figures/                       <- Generated tables and figures used in
+│       │                                  the paper
 │       ├── rq1/                       <- Figures for RQ1
 │       ├── rq2/                       <- Figures for RQ2
 │       ├── rq3/                       <- Figures for RQ3
 │       └── rq4/                       <- Figures for RQ4
-├── mini/                              <- Outputs for reduced mini benchmarks (See Section 6 of this README)
+├── mini/                              <- Outputs for reduced mini benchmarks
+│   │                                      (See Section 6 of this README)
 │   ├── runs/
 │   └── figures/
 ```
 
 # 3. Reproducing specific benchmark problems
-This section explains how to generate and evaluate a specific benchmark problem with a specific configuration.
-In the paper, we used three different benchmarks, four Expecto configurations, and two NL2Postcond configurations.
-This section shows how to run any benchmark by specifying the problem ID for each of the 3 x (4 + 2) = 18 possible combinations.
+This section explains how to generate and evaluate a benchmark problem with a chosen configuration.
+The paper uses three benchmarks, four Expecto configurations, and two NL2Postcond configurations.
+You can run any of combinations by specifying the problem ID.
 
 ## 3.1 Reproducing the paper's motivating example: APPS problem `75`
-To compare Expecto with the two NL2Postcond configurations (`nl2_base` and `nl2_simple`) on the motivating example of the paper, run the following three commands:
+To compare Expecto with the two NL2Postcond configurations (`nl2_base` and `nl2_simple`) on the paper's motivating example, run the following three commands:
 
 ```bash
 python3 scripts/run_artifact.py target \
   --benchmark apps \
-  --config ts \ # Expecto with tree search and test cases
+  --config ts \
   --sample-ids 75
 
 python3 scripts/run_artifact.py target \
   --benchmark apps \
-  --config nl2_base \ # NL2Postcond base prompt strategy
+  --config nl2_base \
   --sample-ids 75
 
 python3 scripts/run_artifact.py target \
   --benchmark apps \
-  --config nl2_simple \ # NL2Postcond simple prompt strategy
+  --config nl2_simple \
   --sample-ids 75
 ```
 
@@ -163,7 +170,7 @@ Each command writes its result to:
   {
     "id": "75",
     "classification": "S&C",
-    "nl_description": "Original natural-language problem description",
+    "nl_description": "You are given a description of a depot...",
     "postcondition": "predicate spec(n: int, m: int, grid: list[string], out_status: string, out_x: int, out_y: int) { ... }"
   }
 ]
@@ -174,7 +181,7 @@ Each command writes its result to:
   {
     "id": "75",
     "classification": "S",
-    "nl_description": "Original natural-language problem description",
+    "nl_description": "You are given a description of a depot...",
     "postcondition": "assert ..."
   }
 ]
@@ -185,7 +192,7 @@ Each command writes its result to:
   {
     "id": "75",
     "classification": "C",
-    "nl_description": "Original natural-language problem description",
+    "nl_description": "You are given a description of a depot...",
     "postcondition": "assert ..."
   }
 ]
@@ -194,9 +201,11 @@ Each command writes its result to:
 Each `sample_results.json` entry contains:
 
 - `id`: the benchmark problem ID. Here it is always `75`.
-- `classification`: the evaluation result for the generated specification. In the paper's comparison, Expecto (`ts`) produces `S&C` (sound and complete), while the two NL2Postcond configurations produce `S` or `C`, matching the discussion that their monolithic outputs are incomplete or unsound.
+- `classification`: the evaluation result for the generated specification. Here, Expecto produces sound and complete (`S&C`). In contrast, the two NL2Postcond configurations produce sound and incomplete (`S`) or complete and unsound (`C`) specifications, respectively.
 - `nl_description`: the original natural-language description of the benchmark problem or method.
 - `postcondition`: the generated formal specification itself. Expecto emits a DSL specification like `predicate spec(...)`. NL2Postcond emits a single assertion like `assert ...`.
+
+*Note: LLM outputs are non-deterministic, so your generated postconditions and classifications may differ from the paper version.*
 
 ## 3.2 How to run other target problems
 ```bash
@@ -209,24 +218,24 @@ python3 scripts/run_artifact.py target \
 - `BENCHMARK` specifies which benchmark to generate. You can choose one of `apps`, `humaneval_plus`, or `defects4j`.
 - `CONFIG` specifies the Expecto or NL2Postcond configuration used in the paper.
   - For Expecto, the following four configurations are available:
-    1. `mono`: the monolithic synthesis without top-down decomposition or tree search (section 4.3 in the paper)
+    1. `mono`: the monolithic synthesis without top-down decomposition (section 4.3 in the paper)
     2. `topdown`: the top-down synthesis without tree search (section 4.3 in the paper)
     3. `ts`: the top-down synthesis with tree search (sections 4.2, 4.3, 4.4, and 4.5 in the paper)
     4. `without_tc`: the top-down tree-search synthesis without test cases (section 4.4 in the paper)
   - For NL2Postcond, the following two configurations are available:
     1. `nl2_base`: the NL2Postcond base prompt strategy (sections 4.2 and 4.5 in the paper)
     2. `nl2_simple`: the NL2Postcond simple prompt strategy (sections 4.2 and 4.5 in the paper)
-- `SAMPLE-IDS` specifies the IDs of the benchmark problems to generate as a comma-separated list. For example, you can provide `15,23,56`. You can find the list of available problem IDs for each benchmark in `/workspace/expecto-artifact/datasets/available_target_ids.csv`.
+- `SAMPLE-IDS` specifies the benchmark problem IDs as a comma-separated list. For example, you can provide `15,23,56`. You can find the available IDs for each benchmark in `/workspace/expecto-artifact/datasets/available_target_ids.csv`.
 
 ## 3.3 What this command does
-This command generates the LLM's raw output and evaluates the generated specifications for soundness and completeness.
+This command generates raw LLM outputs and evaluates the resulting specifications for soundness and completeness.
 The generated outputs and evaluation results are saved at `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<CONFIG>`.
 After the evaluation is complete, the runner also generates `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<CONFIG>/sample_results.json`, so you can immediately inspect the classification result, original natural-language description, and generated postcondition for each sample.
 
-`sample_results.json` is a list of objects per sample, and each object contains the following fields:
+`sample_results.json` contains one object per sample, and each object has the following fields:
 
 - `id`: the sample ID
-- `classification`: the sample classification result
+- `classification`: the sample classification result. It can be one of the following values:
   - `S&C`: sound and complete
   - `S`: sound but incomplete
   - `C`: complete but unsound
@@ -240,8 +249,8 @@ After the evaluation is complete, the runner also generates `/workspace/data/exp
 
 # 4. Reproducing the full paper results
 
-This section explains the `full` command, which runs all experiments in the paper from `RQ1` through `RQ4`.
-It performs the specification generation and evaluation described in Section 3 over the full benchmarks, then produces the final outputs in the form of the paper's figures and tables.
+This section explains the `full` command, which runs all experiments in the paper for `RQ1` through `RQ4`.
+It performs the generation and evaluation described in Section 3 on the full benchmarks, then produces the paper's figures and tables.
 The total expected runtime of the `full` command is approximately 50 hours.
 
 ## 4.1 How to run
@@ -250,7 +259,7 @@ python3 scripts/run_artifact.py full
 ```
 
 ## 4.2 What this does
-Running the command above generates specifications for the three benchmarks, the four Expecto configurations used in the paper, and the two NL2Postcond configurations used in the paper, for a total of 3 x (4 + 2) = 18 generation-and-evaluation runs.
+Running the command above generates specifications for the three benchmarks, the four Expecto configurations, and the two NL2Postcond configurations used in the paper. This results in 3 x (4 + 2) = 18 generation-and-evaluation runs.
 It then processes the outputs into the same figure and table formats shown in the paper.
 
 - The results for each benchmark / generation-configuration combination are stored at:
@@ -262,115 +271,76 @@ It then processes the outputs into the same figure and table formats shown in th
   - Fig. 10 (RQ3 test-case ablation): `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
   - Table 2 (RQ4 Defects4J comparison): `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
-For a detailed explanation of each RQ, please refer to Chapter 5.
+For details on each RQ, see Section 5.
 
-# 5. Reproducing each RQs
+# 5. Reproducing each RQ
+This section explains the commands and outputs used to reproduce each research question (`RQ`).
+If you have already completed the full experiment with the `full` command, you can inspect the generated outputs instead of running the commands again.
 
-Use `rq1`, `rq2`, `rq3`, or `rq4` when you want one research question and its outputs without running the entire artifact.
+## 5.1 RQ1: Effectiveness of Expecto in formal specification generation (Table 1 and Fig. 8)
+This experiment compares Expecto against the two NL2Postcond prompt strategies (`nl2_base` and `nl2_simple`) on the APPS and HumanEval+ benchmarks.
+For Expecto, the comparison uses the tree-search-with-test-cases (`ts`) configuration.
 
-If you have already finished `full`, you do not need to run the individual RQ commands again unless you want to inspect or rerun one part.
-
-```bash
-python3 scripts/run_artifact.py <RQ_NUMBER>
-```
-
-Expected output:
-- Runs only the selected research question under the `full` profile.
-- Raw data:
-  - `/workspace/data/experiment/artifact/full/runs/`
-  - Each executed configuration also writes `/workspace/data/experiment/artifact/full/runs/<BENCHMARK>/<CONFIG>/sample_results.json`
-- Outputs:
-  - `/workspace/data/experiment/artifact/full/figures/<RQ_NUMBER>/`
-
-## RQ1. Effectiveness of Expecto in formal specification generation
-
-`RQ1` compares full Expecto (`ts`) against the two NL2Postcond baselines on `APPS` and `HumanEval+`.
-
+### 5.1.1 How to run
 ```bash
 python3 scripts/run_artifact.py rq1
 ```
 
-Expected output:
-- Runs six raw experiment units for `RQ1` and generates the main comparison table and threshold figure.
-- Raw data:
-  - `/workspace/data/experiment/artifact/full/runs/apps/{ts,nl2_base,nl2_simple}`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,nl2_base,nl2_simple}`
-- Outputs:
-  - Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
-  - Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
+### 5.1.2 What this does
+This command runs specification generation and evaluation for six experiment settings (2 benchmarks x 3 configs) and produces the main `RQ1` outputs: Table 1 and Fig. 8.
+Table 1 shows the number of samples in each classification category (`S&C`, `S`, `C`, and `W`) for each setting.
+Fig. 8 shows how the number of samples in the `S&C`, `S`, `C`, and `W` categories changes as the threshold `X` in the soundness criterion varies. The rule asks whether the specification catches at least `X%` of incorrect input-output pairs.
+The generated table and figure can be found at:
+- Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
+- Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
 
-What this command does:
+## 5.2 RQ2: Effectiveness of top-down synthesis with tree search
+This experiment evaluates the two main generation components of Expecto: top-down specification synthesis and tree search.
+It compares three Expecto configurations on the APPS and HumanEval+ benchmarks: monolithic generation (`mono`), top-down synthesis without tree search (`topdown`), and top-down synthesis with tree search (`ts`).
 
-- Runs six raw experiment units: `apps/ts`, `apps/nl2_base`, `apps/nl2_simple`, `humaneval_plus/ts`, `humaneval_plus/nl2_base`, and `humaneval_plus/nl2_simple`
-- Uses `ts` as the full Expecto configuration and compares it against NL2Postcond `Base` and `Simple`
-
-How this maps to the paper:
-
-- Paper section: `Section 4.2`
-- Paper artifacts: `Table 1` and `Fig. 8`
-- Claim being checked: Expecto performs better than NL2Postcond `Base` and `Simple` in formal specification generation
-
-## RQ2. Effectiveness of top-down synthesis with tree search
-
-`RQ2` compares three Expecto configurations: `mono`, `topdown`, and `ts`.
-
+### 5.2.1 How to run
 ```bash
 python3 scripts/run_artifact.py rq2
 ```
-Expected output:
-- Runs six Expecto ablation units and generates the `RQ2` comparison figure.
-- Raw data:
-  - `/workspace/data/experiment/artifact/full/runs/apps/{mono,topdown,ts}`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{mono,topdown,ts}`
-- Outputs:
-  - `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
 
-Paper mapping:
+### 5.2.2 What this does
+This command runs specification generation and evaluation for six Expecto ablation settings (2 benchmarks x 3 configs) and produces the main `RQ2` output, Fig. 9.
+Fig. 9 shows the number of samples in each classification category (`S&C`, `S`, `C`, and `W`) for each generation strategy.
+This figure is used to check two claims from the paper. First, it checks whether top-down decomposition reduces the number of `W` specifications compared with monolithic generation. Second, it checks whether tree search increases the number of `S&C` specifications compared with top-down generation alone.
+The generated figure can be found at:
+- Fig. 9 (RQ2 generation algorithm ablation): `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
 
-- Paper section: `Section 4.3`
-- Output: `Fig. 9`
-- Claim being checked: top-down decomposition and tree search improve specification generation quality
+## 5.3 RQ3: Impact of test cases on specification generation
+This experiment measures how much user-provided test cases help Expecto during specification generation.
+It compares the full tree-search configuration with test cases (`ts`) against the version that does not use test cases (`without_tc`) on the APPS and HumanEval+ benchmarks.
 
-## RQ3. Impact of test cases on specification generation
-
-`RQ3` compares the full method (`ts`) with the version that does not use test cases (`without_tc`).
-
+### 5.3.1 How to run
 ```bash
 python3 scripts/run_artifact.py rq3
 ```
-Expected output:
-- Runs four experiment units and generates the `RQ3` test-case ablation figure.
-- Raw data:
-  - `/workspace/data/experiment/artifact/full/runs/apps/{ts,without_tc}`
-  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,without_tc}`
-- Outputs:
-  - `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
 
-Paper mapping:
+### 5.3.2 What this does
+This command runs specification generation and evaluation for four experiment settings (2 benchmarks x 2 configs) and produces the main `RQ3` output, Fig. 10.
+Fig. 10 shows the number of samples in each classification category (`S&C`, `S`, `C`, and `W`) with and without test cases.
+This figure is used to check the paper's claim that Expecto still performs reasonably well without test cases, and that a small number of test cases further improves robustness and increases the number of `S&C` specifications.
+The generated figure can be found at:
+- Fig. 10 (RQ3 test-case ablation): `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
 
-- Paper section: `Section 4.4`
-- Output: `Fig. 10`
-- Claim being checked: test cases improve the robustness of specification generation
+## 5.4 RQ4: Effectiveness of Expecto for bug detection in real-world software
+This experiment evaluates whether Expecto can generate bug-detecting specifications for real-world software methods.
+It compares Expecto with the two NL2Postcond prompt strategies (`nl2_base` and `nl2_simple`) on the `Defects4J` benchmark, using the tree-search configuration with test cases (`ts`) for Expecto.
 
-## RQ4. Effectiveness of Expecto for bug detection in real-world software
-
-`RQ4` uses the `Defects4J` benchmark to compare Expecto with the two NL2Postcond baselines.
-
+### 5.4.1 How to run
 ```bash
 python3 scripts/run_artifact.py rq4
 ```
-Expected output:
-- Runs three `Defects4J` experiment units and generates the `RQ4` summary table.
-- Raw data:
-  - `/workspace/data/experiment/artifact/full/runs/defects4j/{ts,nl2_base,nl2_simple}`
-- Outputs:
-  - `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
-Paper mapping:
-
-- Paper section: `Section 4.5`
-- Output: `Table 2`
-- Claim being checked: Expecto finds more bug-detectable correct specifications than NL2Postcond on real-world Java bugs
+### 5.4.2 What this does
+This command runs specification generation and evaluation for three `Defects4J` experiment settings (1 benchmark x 3 configs) and produces the main `RQ4` output, Table 2.
+Table 2 shows the number of methods in each classification category (`S&C`, `S`, `C`, and `W`) for each approach.
+In this benchmark, a specification is considered sound if it detects the bug with at least one bug-triggering unit test. This table therefore measures bug detection capability as well as completeness on passing tests.
+The generated table can be found at:
+- Table 2 (RQ4 Defects4J comparison): `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
 # 6. Running reduced benchmarks for quick inspection
 
