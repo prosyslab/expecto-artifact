@@ -188,14 +188,13 @@ RQ_TARGET_VARIANTS = {
     "rq1": {"ts", "nl2_base", "nl2_simple"},
     "rq2": {"mono", "topdown", "ts"},
     "rq3": {"ts", "without_tc"},
-    "rq4": {"expecto", "nl2_base", "nl2_simple"},
+    "rq4": {"ts", "nl2_base", "nl2_simple"},
 }
 TARGET_VARIANT_DEFAULT_FAMILY = {
     "mono": "rq2",
     "topdown": "rq2",
     "ts": "rq1",
     "without_tc": "rq3",
-    "expecto": "rq4",
     "nl2_base": "rq1",
     "nl2_simple": "rq1",
 }
@@ -530,12 +529,12 @@ def _make_defects4j_expecto_unit(
     expecto_n_completions: int | None = None,
     expecto_max_attempts: int | None = None,
 ) -> ExperimentUnit:
-    run_dir = _run_dir(layout, "defects4j", "expecto")
+    run_dir = _run_dir(layout, "defects4j", "ts")
     return ExperimentUnit(
-        id="defects4j:expecto",
+        id="defects4j:ts",
         rq=rq,
         benchmark="defects4j",
-        variant="expecto",
+        variant="ts",
         run_dir=run_dir,
         command=_build_defects4j_expecto_command(
             run_dir,
@@ -737,7 +736,7 @@ def build_target_unit(
             raise click.ClickException(
                 "RQ4 target mode only supports benchmark=defects4j"
             )
-        if variant == "expecto":
+        if variant == "ts":
             return _make_defects4j_expecto_unit(layout, family, limit, sample_ids)
         return _make_defects4j_nl2_unit(layout, variant, family, limit, sample_ids)
 
@@ -883,7 +882,7 @@ def _build_rq3_figure_config(layout: ArtifactLayout) -> dict[str, dict[str, str]
 def _build_rq4_figure_config(layout: ArtifactLayout) -> dict[str, str]:
     return {
         "benchmark": BENCHMARK_LABELS["defects4j"],
-        "expecto": _click_path(_run_dir(layout, "defects4j", "expecto")),
+        "expecto": _click_path(_run_dir(layout, "defects4j", "ts")),
         "nl2_postcond_base": _click_path(_run_dir(layout, "defects4j", "nl2_base")),
         "nl2_postcond_simple": _click_path(_run_dir(layout, "defects4j", "nl2_simple")),
     }
@@ -1209,7 +1208,6 @@ def mini(
             "topdown",
             "ts",
             "without_tc",
-            "expecto",
             "nl2_base",
             "nl2_simple",
         )
