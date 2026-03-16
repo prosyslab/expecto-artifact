@@ -6,7 +6,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 import click
 
@@ -583,7 +583,7 @@ def build_rq_units(
     rq: str,
     *,
     limit: int | None = None,
-    evalplus_sample_ids: dict[str, Sequence[str]] | None = None,
+    evalplus_sample_ids: Mapping[str, Sequence[str]] | None = None,
     defects4j_limit: int | None = None,
     defects4j_sample_ids: Sequence[str] | None = None,
     validation_sampling_mode: str | None = None,
@@ -1013,8 +1013,16 @@ def cli() -> None:
     default=DEFAULT_OUTPUT_ROOT,
     show_default=True,
 )
-@click.option("--force", is_flag=True, help="Rerun completed experiment units.")
-@click.option("--dry-run", is_flag=True, help="Print commands without executing them.")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Run again even if the output files already exist.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show the commands first without actually running them.",
+)
 def full(output_root: Path, force: bool, dry_run: bool) -> None:
     """Run all experiments required for RQ1-RQ4."""
 
@@ -1023,53 +1031,8 @@ def full(output_root: Path, force: bool, dry_run: bool) -> None:
     _run_profile_by_rq(layout, force=force, dry_run=dry_run)
 
 
-@cli.command()
-@click.option(
-    "--rq",
-    type=click.Choice(RQ_CHOICES),
-    required=True,
-    help="Which research question to run.",
-)
-@click.option(
-    "--output-root",
-    type=click.Path(file_okay=False, path_type=Path),
-    default=DEFAULT_OUTPUT_ROOT,
-    show_default=True,
-)
-@click.option(
-    "--limit",
-    type=click.IntRange(min=1),
-    default=None,
-    help="Optional sample limit for the selected RQ.",
-)
-@click.option(
-    "--validation-limit",
-    type=click.IntRange(min=1),
-    default=None,
-    help="Optional validation test-case cap applied to both positive and negative validation sets.",
-)
-@click.option(
-    "--expecto-n-completions",
-    type=click.IntRange(min=1),
-    default=None,
-    help="Optional override for Expecto --n_completions in this run.",
-)
-@click.option(
-    "--expecto-max-attempts",
-    type=click.IntRange(min=1),
-    default=None,
-    help="Optional override for Expecto --max_attempts in this run.",
-)
-@click.option(
-    "--mini",
-    "mini_mode",
-    is_flag=True,
-    help="Run this RQ with the fixed mini profile under mini/ outputs.",
-)
-@click.option("--force", is_flag=True, help="Rerun completed experiment units.")
-@click.option("--dry-run", is_flag=True, help="Print commands without executing them.")
-def rq(
-    rq: str,
+def _run_single_rq(
+    rq_name: str,
     output_root: Path,
     limit: int | None,
     validation_limit: int | None,
@@ -1079,8 +1042,6 @@ def rq(
     force: bool,
     dry_run: bool,
 ) -> None:
-    """Run one research question."""
-
     if mini_mode and limit is not None:
         raise click.UsageError("--mini cannot be combined with --limit.")
     if mini_mode and validation_limit is not None:
@@ -1105,11 +1066,88 @@ def rq(
 
     units = build_rq_units(
         layout,
-        rq,
+        rq_name,
         **build_kwargs,
     )
     execute_units(units, force=force, dry_run=dry_run)
-    generate_figures_for_rq(layout, rq, force=force, dry_run=dry_run)
+    generate_figures_for_rq(layout, rq_name, force=force, dry_run=dry_run)
+
+
+def _add_rq_command(rq_name: str) -> None:
+    @cli.command(name=rq_name)
+    @click.option(
+        "--output-root",
+        type=click.Path(file_okay=False, path_type=Path),
+        default=DEFAULT_OUTPUT_ROOT,
+        show_default=True,
+    )
+    @click.option(
+        "--limit",
+        type=click.IntRange(min=1),
+        default=None,
+        help="Optional sample limit for this RQ.",
+    )
+    @click.option(
+        "--validation-limit",
+        type=click.IntRange(min=1),
+        default=None,
+        help="Optional validation test-case cap applied to both positive and negative validation sets.",
+    )
+    @click.option(
+        "--expecto-n-completions",
+        type=click.IntRange(min=1),
+        default=None,
+        help="Optional override for Expecto --n_completions in this run.",
+    )
+    @click.option(
+        "--expecto-max-attempts",
+        type=click.IntRange(min=1),
+        default=None,
+        help="Optional override for Expecto --max_attempts in this run.",
+    )
+    @click.option(
+        "--mini",
+        "mini_mode",
+        is_flag=True,
+        help="Run this RQ with the fixed mini profile under mini/ outputs.",
+    )
+    @click.option(
+        "--force",
+        is_flag=True,
+        help="Run again even if the output files already exist.",
+    )
+    @click.option(
+        "--dry-run",
+        is_flag=True,
+        help="Show the commands first without actually running them.",
+    )
+    def rq_command(
+        output_root: Path,
+        limit: int | None,
+        validation_limit: int | None,
+        expecto_n_completions: int | None,
+        expecto_max_attempts: int | None,
+        mini_mode: bool,
+        force: bool,
+        dry_run: bool,
+    ) -> None:
+        """Run one research question."""
+
+        _run_single_rq(
+            rq_name,
+            output_root,
+            limit,
+            validation_limit,
+            expecto_n_completions,
+            expecto_max_attempts,
+            mini_mode,
+            force,
+            dry_run,
+        )
+
+
+for _rq_name in RQ_CHOICES:
+    _add_rq_command(_rq_name)
 
 
 @cli.command()
@@ -1119,8 +1157,16 @@ def rq(
     default=DEFAULT_OUTPUT_ROOT,
     show_default=True,
 )
-@click.option("--force", is_flag=True, help="Rerun completed experiment units.")
-@click.option("--dry-run", is_flag=True, help="Print commands without executing them.")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Run again even if the output files already exist.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show the commands first without actually running them.",
+)
 def mini(
     output_root: Path,
     force: bool,
@@ -1179,8 +1225,16 @@ def mini(
     default=None,
     help="Comma-separated benchmark problem IDs to run.",
 )
-@click.option("--force", is_flag=True, help="Rerun the targeted experiment unit.")
-@click.option("--dry-run", is_flag=True, help="Print commands without executing them.")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Run again even if the output files already exist.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show the commands first without actually running them.",
+)
 def target(
     benchmark: str,
     family: str,

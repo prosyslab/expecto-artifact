@@ -75,7 +75,7 @@ Expected output:
 [PASS] dataset file: datasets/human_eval_plus.json
 [PASS] dataset file: datasets/defects4j.jsonl
 Running RQ1 smoke test:
-/usr/bin/python3 /workspace/expecto-artifact/scripts/run_artifact.py rq --rq rq1 --limit 1 --output-root /workspace/data/experiment/artifact/test-smoke --force
+/usr/bin/python3 /workspace/expecto-artifact/scripts/run_artifact.py rq1 --limit 1 --output-root /workspace/data/experiment/artifact/test-smoke --force
 ...
 [PASS] RQ1 execution: run_artifact.py completed successfully
 [PASS] Expecto markers: .../full/runs/apps/ts/evaluation_result/manifest.json
@@ -133,7 +133,7 @@ Generated outputs from the artifact runner are written under:
 ---
 # 3. Full reproduction
 
-All commands use `/workspace/data/experiment/artifact` as the default `--output-root`. The artifact runner supports four modes: `full`, `rq`, `mini`, and `target`. Recommended flow: reproduce full first, then check outputs under `full/figures/`, then RQ-specific runs as needed.
+All commands use `/workspace/data/experiment/artifact` as the default `--output-root`. The artifact runner supports seven modes: `full`, `rq1`, `rq2`, `rq3`, `rq4`, `mini`, and `target`. Recommended flow: reproduce full first, then check outputs under `full/figures/`, then RQ-specific runs as needed.
 
 Run everything:
 
@@ -143,13 +143,13 @@ Run everything:
 python3 scripts/run_artifact.py full
 ```
 
-Run everything and force reruns:
+Run everything again, even if results already exist:
 
 ```bash
 python3 scripts/run_artifact.py full --force
 ```
 
-Preview the full workflow without executing:
+Show the full workflow commands without running them:
 
 ```bash
 python3 scripts/run_artifact.py full --dry-run
@@ -180,14 +180,20 @@ What to check:
 
 ---
 # 4. RQ reproduction
-Use `rq` when you want one paper result and its associated outputs without running the full artifact.
+Use `rq1`, `rq2`, `rq3`, or `rq4` when you want one paper result and its associated outputs without running the full artifact.
 
-> **Note:** If you have already completed the `full` run, all figures and tables for the paper will have been generated. There is no need to run `rq` separately unless you want to rerun or inspect a specific research question in detail.
+> **Note:** If you have already completed the `full` run, all figures and tables for the paper will have been generated. There is no need to run `rq1`-`rq4` separately unless you want to rerun or inspect a specific research question in detail.
 
-Run one RQ with the fixed mini profile (`RQ_NUMBER` can be `rq1`, `rq2`, `rq3`, or `rq4`):
+Run one RQ with the fixed mini profile:
+
+- `--force`: run again even if that RQ already finished before
+- `--dry-run`: show the commands first without actually running them
 
 ```bash
-python3 scripts/run_artifact.py rq --rq <RQ_NUMBER> --mini
+python3 scripts/run_artifact.py rq1 --mini
+python3 scripts/run_artifact.py rq2 --mini
+python3 scripts/run_artifact.py rq3 --mini
+python3 scripts/run_artifact.py rq4 --mini
 ```
 
 This uses the same fixed mini subsets as `mini`, but only for the requested RQ, and writes outputs under `/workspace/data/experiment/artifact/mini`.
@@ -196,7 +202,7 @@ This uses the same fixed mini subsets as `mini`, but only for the requested RQ, 
 Run `RQ1`:
 
 ```bash
-python3 scripts/run_artifact.py rq --rq rq1
+python3 scripts/run_artifact.py rq1
 ```
 
 What this command does:
@@ -229,7 +235,7 @@ What to check:
 Run `RQ2`:
 
 ```bash
-python3 scripts/run_artifact.py rq --rq rq2
+python3 scripts/run_artifact.py rq2
 ```
 
 What this command does:
@@ -260,7 +266,7 @@ What to check:
 Run `RQ3`:
 
 ```bash
-python3 scripts/run_artifact.py rq --rq rq3
+python3 scripts/run_artifact.py rq3
 ```
 
 What this command does:
@@ -292,7 +298,7 @@ What to check:
 Run `RQ4`:
 
 ```bash
-python3 scripts/run_artifact.py rq --rq rq4
+python3 scripts/run_artifact.py rq4
 ```
 
 What this command does:
@@ -424,4 +430,4 @@ What this command does:
 - Preserves the same output directory layout used by Section 5 target runs
 - Does not generate paper-facing figures or tables automatically
 
-If you want the corresponding paper figure or table after reproducing a specific `target_id`, rerun the appropriate `rq` command once the needed raw runs are available.
+If you want the corresponding paper figure or table after reproducing a specific `target_id`, rerun the appropriate `rq1`, `rq2`, `rq3`, or `rq4` command once the needed raw runs are available.
