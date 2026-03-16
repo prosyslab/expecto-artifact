@@ -9,7 +9,7 @@ The paper studies the following four research questions:
 - `RQ3` How do test cases and SMT-based validation contribute to the performance of Expecto?
 - `RQ4` Can Expecto be practically applied to detect functional bugs in real-world software?
 
-The artifact entrypoint is `./scripts/run_artifact.py`.
+The artifact execution script is `./scripts/run_artifact.py`.
 
 # 1. Getting started
 ## System requirements
@@ -133,32 +133,22 @@ Generated outputs from the artifact runner are written under:
 ---
 # 3. Full reproduction
 
-All commands use `/workspace/data/experiment/artifact` as the default `--output-root`. The artifact runner supports seven modes: `full`, `rq1`, `rq2`, `rq3`, `rq4`, `mini`, and `target`. Recommended flow: reproduce full first, then check outputs under `full/figures/`, then RQ-specific runs as needed.
-
-Run everything:
-
+This command runs all the experiments required for the paper.
 **Expected runtime for `full`: about 50 hours.**
 
 ```bash
 python3 scripts/run_artifact.py full
 ```
-
-Run everything again, even if results already exist:
+By default, it will not run if an execution result already exists. You can force it to run again by using `--force`:
 
 ```bash
 python3 scripts/run_artifact.py full --force
 ```
 
-Show the full workflow commands without running them:
-
-```bash
-python3 scripts/run_artifact.py full --dry-run
-```
-
 What this command does:
 
-- Runs all raw experiment units needed for `RQ1`-`RQ4`
-- Generates all tables and figures after the runs finish
+- Runs all experiments required for reproducing paper results.
+- Generates all tables and figures after the runs finish.
 
 Where the results are stored:
 
@@ -173,10 +163,7 @@ Where the results are stored:
     - `Fig. 10 (RQ3 test-case and SMT-based validation ablation)`: `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
     - `Table 2 (RQ4 Defects4J comparison)`: `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
-What to check:
-
-- All paper-mapped files above exist after the run
-- The `full/runs/...` tree contains per-variant run directories for the benchmarks used by each RQ
+Please refer to Section 4 for the claims that must be checked for each RQ.
 
 ---
 # 4. RQ reproduction
@@ -184,19 +171,11 @@ Use `rq1`, `rq2`, `rq3`, or `rq4` when you want one paper result and its associa
 
 > **Note:** If you have already completed the `full` run, all figures and tables for the paper will have been generated. There is no need to run `rq1`-`rq4` separately unless you want to rerun or inspect a specific research question in detail.
 
-Run one RQ with the fixed mini profile:
-
-- `--force`: run again even if that RQ already finished before
-- `--dry-run`: show the commands first without actually running them
+Run one RQ (`RQ_NUMBER` can be `rq1`, `rq2`, `rq3`, or `rq4`):
 
 ```bash
-python3 scripts/run_artifact.py rq1 --mini
-python3 scripts/run_artifact.py rq2 --mini
-python3 scripts/run_artifact.py rq3 --mini
-python3 scripts/run_artifact.py rq4 --mini
+python3 scripts/run_artifact.py <RQ_NUMBER>
 ```
-
-This uses the same fixed mini subsets as `mini`, but only for the requested RQ, and writes outputs under `/workspace/data/experiment/artifact/mini`.
 
 ## RQ1. Effectiveness of Expecto in formal specification generation
 Run `RQ1`:
@@ -226,11 +205,6 @@ How this maps to the paper:
 - Benchmarks: `HumanEval+` and `APPS`
 - Claim being checked: Expecto outperforms NL2Postcond `Base` and `Simple` in formal specification generation
 
-What to check:
-
-- `evaluation.rq1.table.pdf` is the compiled table-only PDF artifact for the same comparison
-- `evaluation.thresholds.pdf` is the figure for the threshold analysis in `Fig. 8`
-
 ## RQ2. Effectiveness of the top-down specification synthesis with tree search
 Run `RQ2`:
 
@@ -256,7 +230,7 @@ How this maps to the paper:
 - Paper section: `§4.3`
 - Figure coverage: `Fig. 9`
 - Benchmarks: `HumanEval+` and `APPS`
-- Claim being checked: the top-down decomposition reduces wrong specifications and tree search increases sound-and-complete specifications
+- Claim being checked: the top-down decomposition reduces wrong specifications and tree search increases sound-and-complete (S&C) specifications
 
 What to check:
 
@@ -286,13 +260,9 @@ How this maps to the paper:
 
 - Paper section: `§4.4`
 - Figure coverage: `Fig. 10`
-- Methodology linkage: `without_smt` and `without_tc` ablations isolate the SMT-based validation logic and test case usage in validation step in `§3.4`
+- Methodology: `Without SMT` and `Without TC` ablations isolate the SMT-based validation logic and test case usage in validation step in `§3.4`
 - Benchmarks: `HumanEval+` and `APPS`
 - Claim being checked: test cases and SMT-based validation improve robustness of specification generation
-
-What to check:
-
-- `evaluation.rq3.testcase.pdf` includes both the `without_tc` and `without_smt` ablations against `ts`
 
 ## RQ4. Effectiveness of Expecto for bug detection in real-world software
 Run `RQ4`:
@@ -319,11 +289,6 @@ How this maps to the paper:
 - Table coverage: `Table 2`
 - Benchmark: `Defects4J`
 - Claim being checked: Expecto generates more bug-detectable correct specifications than NL2Postcond on real-world Java bugs
-
-What to check:
-
-- `evaluation.rq4.defects4j.table.pdf` is the compiled table-only PDF for the same comparison
-- The corresponding raw run directories under `full/runs/defects4j/` exist for all three compared systems
 
 ## Quick check: `mini`
 Run the reduced sweep:
@@ -352,13 +317,7 @@ Where the results are stored:
 
 How this maps to the paper:
 
-- `mini` is not meant to reproduce the exact paper numbers
-- It is the short AE check path for checking that the full `§4` evaluation pipeline is wired correctly
-
-What to check:
-
-- The `mini/runs/` and `mini/figures/` directories are created
-- Each `mini/figures/rq*/` directory contains the same output file types as the corresponding `full` run
+- `mini` is not meant to reproduce the exact paper numbers. It is only reproducing the paper's overall trend.
 
 ---
 # 5. Target reproduction
