@@ -100,20 +100,49 @@ def sanitize_method_identifier(text: str) -> str:
     return sanitized or "method"
 
 
+def parse_sample_ids(sample_ids: str | None) -> list[str]:
+    if not sample_ids:
+        return []
+
+    ordered_ids: list[str] = []
+    seen: set[str] = set()
+    for raw_id in sample_ids.split(","):
+        sample_id = raw_id.strip()
+        if not sample_id or sample_id in seen:
+            continue
+        ordered_ids.append(sample_id)
+        seen.add(sample_id)
+    return ordered_ids
+
+
+def build_method_sample_id_from_fields(
+    project: str,
+    bug_id: str,
+    file_path: str,
+    signature: str,
+    ids_count: dict[str, int],
+) -> str:
+    method_token = sanitize_method_identifier(f"{file_path}_{signature}")
+    base_id = f"{project}_{bug_id}_{method_token}"
+    ids_count[base_id] = ids_count.get(base_id, 0) + 1
+    if ids_count[base_id] == 1:
+        return base_id
+    return f"{base_id}_{ids_count[base_id]}"
+
+
 def build_method_sample_id(
     project: str,
     bug_id: str,
     method_info: MethodInfo,
     ids_count: dict[str, int],
 ) -> str:
-    method_token = sanitize_method_identifier(
-        f"{method_info.file}_{method_info.signature}"
+    return build_method_sample_id_from_fields(
+        project,
+        bug_id,
+        method_info.file,
+        method_info.signature,
+        ids_count,
     )
-    base_id = f"{project}_{bug_id}_{method_token}"
-    ids_count[base_id] = ids_count.get(base_id, 0) + 1
-    if ids_count[base_id] == 1:
-        return base_id
-    return f"{base_id}_{ids_count[base_id]}"
 
 
 def build_defects4j_method_prompt(
@@ -231,9 +260,92 @@ def record_to_samples(
     ]
 
 
-def _collect_jsonl_method_locations(
-    jsonl_file: Path, limit: int | None = None
+def filter_dataset_by_sample_ids(dataset: Dataset, sample_ids: str | None) -> Dataset:
+    ordered_ids = parse_sample_ids(sample_ids)
+    if not ordered_ids:
+        return dataset
+
+    sample_by_id = {str(sample.id): sample for sample in dataset}
+    missing_ids = [
+        sample_id for sample_id in ordered_ids if sample_id not in sample_by_id
+    ]
+    if missing_ids:
+        logger.warning("Unknown Defects4J sample IDs requested: %s", missing_ids)
+
+    filtered_samples = [
+        sample_by_id[sample_id]
+        for sample_id in ordered_ids
+        if sample_id in sample_by_id
+    ]
+    logger.info("Filtered Defects4J dataset to %d sample(s)", len(filtered_samples))
+    return MemoryDataset(
+        samples=filtered_samples,
+        name=getattr(dataset, "name", None),
+        location=getattr(dataset, "location", None),
+        shuffled=getattr(dataset, "shuffled", False),
+    )
+
+
+def _collect_jsonl_method_locations_by_sample_ids(
+    jsonl_file: Path,
+    ordered_ids: list[str],
 ) -> list[tuple[int, int]]:
+    matched_locations: dict[str, tuple[int, int]] = {}
+    requested_ids = set(ordered_ids)
+
+    with jsonl_file.open("rb") as file:
+        while True:
+            offset = file.tell()
+            line = file.readline()
+            if not line:
+                break
+            if not line.strip():
+                continue
+
+            record = json.loads(line)
+            project = record["project"]
+            bug_id = str(record["bug_id"])
+            ids_count: dict[str, int] = {}
+            for method_index, method_dump in enumerate(record.get("method_dumps") or []):
+                method_info = method_dump.get("method_info") or {}
+                sample_id = build_method_sample_id_from_fields(
+                    project,
+                    bug_id,
+                    method_info.get("file", ""),
+                    method_info.get("signature", ""),
+                    ids_count,
+                )
+                if sample_id not in requested_ids or sample_id in matched_locations:
+                    continue
+                matched_locations[sample_id] = (offset, method_index)
+                if len(matched_locations) == len(ordered_ids):
+                    break
+
+            if len(matched_locations) == len(ordered_ids):
+                break
+
+    missing_ids = [sample_id for sample_id in ordered_ids if sample_id not in matched_locations]
+    if missing_ids:
+        logger.warning("Unknown Defects4J sample IDs requested: %s", missing_ids)
+
+    locations = [
+        matched_locations[sample_id]
+        for sample_id in ordered_ids
+        if sample_id in matched_locations
+    ]
+    logger.info("Filtered Defects4J dataset to %d sample(s)", len(locations))
+    return locations
+
+
+def _collect_jsonl_method_locations(
+    jsonl_file: Path,
+    limit: int | None = None,
+    sample_ids: str | None = None,
+) -> list[tuple[int, int]]:
+    ordered_ids = parse_sample_ids(sample_ids)
+    if ordered_ids:
+        return _collect_jsonl_method_locations_by_sample_ids(jsonl_file, ordered_ids)
+
     locations: list[tuple[int, int]] = []
     with jsonl_file.open("rb") as file:
         while True:
@@ -260,10 +372,15 @@ class Defects4jJsonlDataset(Dataset):
         jsonl_file: Path,
         sample_factory: Callable[[dict[str, Any], int], Sample],
         limit: int | None = None,
+        sample_ids: str | None = None,
     ):
         self._jsonl_file = jsonl_file
         self._sample_factory = sample_factory
-        self._method_locations = _collect_jsonl_method_locations(jsonl_file, limit=limit)
+        self._method_locations = _collect_jsonl_method_locations(
+            jsonl_file,
+            limit=limit,
+            sample_ids=sample_ids,
+        )
         self._order = list(range(len(self._method_locations)))
         self._cache: dict[int, Sample] = {}
         self._name = jsonl_file.stem
@@ -362,6 +479,7 @@ def defects4j(
     check_unsat: bool = True,
     include_method_code: bool = True,
     limit: int | None = None,
+    sample_ids: str | None = None,
     validation_sampling_mode: str = "all",
     validation_positive_cap: int | None = None,
     validation_negative_cap: int | None = None,
@@ -383,6 +501,7 @@ def defects4j(
     dataset = load_defects4j_dataset(
         include_method_code,
         limit=limit,
+        sample_ids=sample_ids,
         validation_sampling_mode=validation_sampling_mode,
         validation_positive_cap=validation_positive_cap,
         validation_negative_cap=validation_negative_cap,
@@ -406,6 +525,7 @@ def defects4j(
 def load_defects4j_dataset(
     include_method_code: bool,
     limit: int | None = None,
+    sample_ids: str | None = None,
     validation_sampling_mode: str = "all",
     validation_positive_cap: int | None = None,
     validation_negative_cap: int | None = None,
@@ -428,9 +548,10 @@ def load_defects4j_dataset(
             dataset_file,
             sample_factory=sample_factory,
             limit=limit,
+            sample_ids=sample_ids,
         )
 
-    return load_legacy_defects4j_dataset(
+    dataset = load_legacy_defects4j_dataset(
         dataset_file,
         include_method_code=include_method_code,
         limit=limit,
@@ -439,6 +560,7 @@ def load_defects4j_dataset(
         validation_negative_cap=validation_negative_cap,
         validation_sampling_seed=validation_sampling_seed,
     )
+    return filter_dataset_by_sample_ids(dataset, sample_ids)
 
 
 def load_legacy_defects4j_dataset(

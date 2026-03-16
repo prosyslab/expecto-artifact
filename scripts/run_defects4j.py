@@ -14,6 +14,7 @@ DEFAULT_BASE_DIR = "/workspace/data/experiment/defects4j"
 @click.option("--debug", is_flag=True, help="Run in debug mode")
 @click.option("--exp-name", type=str, default="exp", help="The name of the experiment")
 @click.option("--limit", type=int, default=None, help="The number of problems to run")
+@click.option("--sample-ids", type=str, default=None, help="Comma-separated Defects4J sample IDs to run")
 @click.option("--dev", is_flag=True, help="Run in dev mode")
 @click.option("--n_completions", type=int, default=1, help="The number of completions to use")
 @click.option("--max_attempts", type=int, default=5, help="The maximum number of attempts to use")
@@ -30,6 +31,7 @@ def run(
     exp_name,
     dev,
     limit,
+    sample_ids,
     n_completions,
     max_attempts,
     temperature,
@@ -42,6 +44,9 @@ def run(
     validation_sampling_seed,
 ):
     """Run Defects4J benchmark with specified solver."""
+    if limit is not None and sample_ids:
+        raise click.UsageError("Use either --limit or --sample-ids, not both.")
+
     args = [
         "python3",
         "scripts/executor.py",
@@ -74,6 +79,8 @@ def run(
         args.extend(["--max_connections", "16", "--max_subprocesses", "4", "--max_sandboxes", "4"])
     if limit:
         args.extend(["--limit", str(limit)])
+    if sample_ids:
+        args.extend(["--sample-ids", sample_ids])
     if dsl:
         args.append("--dsl")
     if use_test_cases:

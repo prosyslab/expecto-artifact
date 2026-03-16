@@ -210,6 +210,7 @@ async def run_generation(
     limit: int | None,
     max_concurrency: int,
     prompt_versions: tuple[str, ...] = PROMPT_VERSIONS,
+    sample_ids: list[str] | None = None,
 ) -> None:
     benchmark_cfg = type(
         "BenchmarksCfg",
@@ -232,7 +233,11 @@ async def run_generation(
 
     try:
         for sequence_index, record in enumerate(
-            iter_defects4j_method_examples(benchmark_cfg, limit=limit)
+            iter_defects4j_method_examples(
+                benchmark_cfg,
+                limit=limit,
+                sample_ids=sample_ids,
+            )
         ):
             method_record = MethodRecord.from_dict(record)
             for prompt_version in prompt_versions:

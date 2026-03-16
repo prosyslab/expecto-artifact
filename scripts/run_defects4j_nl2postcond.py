@@ -26,6 +26,21 @@ VALID_PROMPT_VARIANTS = {
 }
 
 
+def parse_sample_ids(sample_ids: str | None) -> list[str]:
+    if not sample_ids:
+        return []
+
+    ordered_ids: list[str] = []
+    seen: set[str] = set()
+    for raw_id in sample_ids.split(","):
+        sample_id = raw_id.strip()
+        if not sample_id or sample_id in seen:
+            continue
+        ordered_ids.append(sample_id)
+        seen.add(sample_id)
+    return ordered_ids
+
+
 def empty_category_counts() -> dict[str, int]:
     return {"SC": 0, "S": 0, "C": 0, "W": 0}
 
@@ -82,6 +97,63 @@ def run_validation(
             command.extend(["--limit", str(limit)])
 
         subprocess.run(command, check=True)
+
+
+def write_filtered_jsonl(
+    input_path: Path,
+    output_path: Path,
+    sample_ids: list[str],
+) -> list[str]:
+    rows_by_id: dict[str, dict] = {}
+    requested_ids = set(sample_ids)
+
+    with input_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            row = json.loads(stripped)
+            sample_id = str(row.get("id") or row.get("task_id") or "").strip()
+            if sample_id not in requested_ids or sample_id in rows_by_id:
+                continue
+            rows_by_id[sample_id] = row
+            if len(rows_by_id) == len(sample_ids):
+                break
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as handle:
+        for sample_id in sample_ids:
+            row = rows_by_id.get(sample_id)
+            if row is None:
+                continue
+            handle.write(json.dumps(row, ensure_ascii=True) + "\n")
+
+    return [sample_id for sample_id in sample_ids if sample_id not in rows_by_id]
+
+
+def prepare_validation_input_dir(
+    *,
+    input_dir: Path,
+    validation_output_dir: Path,
+    prompt_versions: tuple[str, ...],
+    sample_ids: list[str],
+) -> Path:
+    if not sample_ids:
+        return input_dir
+
+    filtered_input_dir = validation_output_dir / "_filtered_inputs"
+    filtered_input_dir.mkdir(parents=True, exist_ok=True)
+    for prompt_version in prompt_versions:
+        input_path = input_dir / f"{prompt_version}.jsonl"
+        output_path = filtered_input_dir / f"{prompt_version}.jsonl"
+        missing_ids = write_filtered_jsonl(input_path, output_path, sample_ids)
+        if missing_ids:
+            click.echo(
+                f"Warning: {input_path.name} is missing requested Defects4J sample IDs: {', '.join(missing_ids)}",
+                err=True,
+            )
+
+    return filtered_input_dir
 
 
 def write_aggregated_counts(validation_output_dir: Path) -> Path:
@@ -145,6 +217,12 @@ def write_aggregated_counts(validation_output_dir: Path) -> Path:
 )
 @click.option("--limit", type=int, default=None, help="Limit the number of methods.")
 @click.option(
+    "--sample-ids",
+    type=str,
+    default=None,
+    help="Comma-separated Defects4J sample IDs to run.",
+)
+@click.option(
     "--max-concurrency",
     type=click.IntRange(min=1),
     default=8,
@@ -180,12 +258,17 @@ def main(
     output_dir: Path,
     variant: str,
     limit: int | None,
+    sample_ids: str | None,
     max_concurrency: int,
     run_evaluation: bool,
     evaluate_only: bool,
     compile_timeout: int,
     test_timeout: int,
 ) -> None:
+    parsed_sample_ids = parse_sample_ids(sample_ids)
+    if limit is not None and parsed_sample_ids:
+        raise click.UsageError("Use either --limit or --sample-ids, not both.")
+
     prompt_versions = resolve_prompt_versions(variant)
 
     if not evaluate_only:
@@ -198,17 +281,24 @@ def main(
                 limit=limit,
                 max_concurrency=max_concurrency,
                 prompt_versions=prompt_versions,
+                sample_ids=parsed_sample_ids,
             )
         )
 
     if run_evaluation:
         validation_dir = resolve_validation_output_dir(output_dir)
         validation_dir.mkdir(parents=True, exist_ok=True)
-        run_validation(
+        validation_input_dir = prepare_validation_input_dir(
             input_dir=output_dir,
             validation_output_dir=validation_dir,
             prompt_versions=prompt_versions,
-            limit=limit,
+            sample_ids=parsed_sample_ids,
+        )
+        run_validation(
+            input_dir=validation_input_dir,
+            validation_output_dir=validation_dir,
+            prompt_versions=prompt_versions,
+            limit=None if parsed_sample_ids else limit,
             compile_timeout=compile_timeout,
             test_timeout=test_timeout,
             max_concurrency=max_concurrency,

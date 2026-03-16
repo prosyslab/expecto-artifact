@@ -1,10 +1,13 @@
 import json
 import re
+from logging import getLogger
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 from evalplus.data import get_human_eval_plus
 from dataset_paths import get_defects4j_dataset_file
+
+logger = getLogger(__name__)
 
 
 def load_evalplus_subset(evalplus_cfg):
@@ -45,6 +48,21 @@ METHOD_ID_SANITIZER = re.compile(r"[^0-9A-Za-z]+")
 def sanitize_method_identifier(text: str) -> str:
     sanitized = METHOD_ID_SANITIZER.sub("_", text).strip("_")
     return sanitized or "method"
+
+
+def normalize_sample_ids(sample_ids: Iterable[str] | None) -> list[str]:
+    if sample_ids is None:
+        return []
+
+    ordered_ids: list[str] = []
+    seen: set[str] = set()
+    for raw_id in sample_ids:
+        sample_id = str(raw_id).strip()
+        if not sample_id or sample_id in seen:
+            continue
+        ordered_ids.append(sample_id)
+        seen.add(sample_id)
+    return ordered_ids
 
 
 def extract_method_name(signature: str) -> str:
@@ -95,7 +113,64 @@ def iter_defects4j_bugs(dataset_path: Path) -> Iterator[dict[str, Any]]:
 def iter_expecto_defects4j_methods(
     bugs: Iterable[dict[str, Any]],
     limit: int | None = None,
+    sample_ids: Iterable[str] | None = None,
 ) -> Iterator[dict[str, Any]]:
+    ordered_sample_ids = normalize_sample_ids(sample_ids)
+    if ordered_sample_ids:
+        requested_ids = set(ordered_sample_ids)
+        matched_records: dict[str, dict[str, Any]] = {}
+        for bug in bugs:
+            project = bug["project"]
+            bug_id = str(bug["bug_id"])
+            ids_count: dict[str, int] = {}
+
+            for method_dump in bug.get("method_dumps", []):
+                method_info = method_dump["method_info"]
+                method_signature = method_info["signature"]
+                method_name = extract_method_name(method_signature)
+                method_token = sanitize_method_identifier(
+                    f"{method_info['file']}_{method_signature}"
+                )
+                base_id = f"{project}_{bug_id}_{method_token}"
+                ids_count[base_id] = ids_count.get(base_id, 0) + 1
+                task_id = base_id
+                if ids_count[base_id] > 1:
+                    task_id = f"{base_id}_{ids_count[base_id]}"
+
+                if task_id not in requested_ids or task_id in matched_records:
+                    continue
+
+                matched_records[task_id] = {
+                    "task_id": task_id,
+                    "id": task_id,
+                    "project": project,
+                    "bug_id": bug_id,
+                    "method_name": method_name,
+                    "method_signature": method_signature,
+                    "javadoc": method_info.get("javadoc", {}),
+                    "reference_code": method_info.get("code", ""),
+                    "file": method_info.get("file", ""),
+                    "entry_schema": method_info.get("entry_schema", {}),
+                    "exit_schema": method_info.get("exit_schema", {}),
+                }
+                if len(matched_records) == len(ordered_sample_ids):
+                    break
+
+            if len(matched_records) == len(ordered_sample_ids):
+                break
+
+        missing_ids = [
+            sample_id for sample_id in ordered_sample_ids if sample_id not in matched_records
+        ]
+        if missing_ids:
+            logger.warning("Unknown Defects4J sample IDs requested: %s", missing_ids)
+
+        for sample_id in ordered_sample_ids:
+            record = matched_records.get(sample_id)
+            if record is not None:
+                yield record
+        return
+
     ids_count: dict[str, int] = {}
     yielded = 0
 
@@ -138,14 +213,24 @@ def load_expecto_defects4j_methods(bugs, limit=None):
     return list(iter_expecto_defects4j_methods(bugs, limit=limit))
 
 
-def iter_defects4j_method_examples(benchmarks_cfg, limit=None):
+def iter_defects4j_method_examples(benchmarks_cfg, limit=None, sample_ids=None):
     dataset_path = resolve_defects4j_dataset_path(benchmarks_cfg)
     bugs = iter_defects4j_bugs(dataset_path)
-    yield from iter_expecto_defects4j_methods(bugs, limit=limit)
+    yield from iter_expecto_defects4j_methods(
+        bugs,
+        limit=limit,
+        sample_ids=sample_ids,
+    )
 
 
-def load_defects4j_method_examples(benchmarks_cfg, limit=None):
-    return list(iter_defects4j_method_examples(benchmarks_cfg, limit=limit))
+def load_defects4j_method_examples(benchmarks_cfg, limit=None, sample_ids=None):
+    return list(
+        iter_defects4j_method_examples(
+            benchmarks_cfg,
+            limit=limit,
+            sample_ids=sample_ids,
+        )
+    )
 
 
 def load_defects4j(benchmarks_cfg):

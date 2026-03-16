@@ -76,7 +76,28 @@ MINI_EVALPLUS_SAMPLE_IDS = {
         "162",
     ),
 }
-MINI_DEFECTS4J_LIMIT = 5
+MINI_DEFECTS4J_SAMPLE_IDS = (
+    "Chart_6_workspace_objdump_d4j_full_fresh_chart_6_source_org_jfree_chart_util_ShapeList_java_boolean_equals_Object_obj",
+    "Cli_18_workspace_objdump_d4j_full_fresh_cli_18_src_java_org_apache_commons_cli_PosixParser_java_void_processOptionToken_String_token_boolean_stopAtNonOption",
+    "Compress_40_workspace_objdump_d4j_full_compress_40_src_main_java_org_apache_commons_compress_utils_BitInputStream_java_long_readBits_int_count",
+    "Jsoup_76_workspace_objdump_d4j_full_jsoup_76_src_main_java_org_jsoup_parser_HtmlTreeBuilderState_java_boolean_process_Token_t_HtmlTreeBuilder_tb",
+    "Jsoup_85_workspace_objdump_d4j_full_jsoup_85_src_main_java_org_jsoup_nodes_Attribute_java_Attribute_String_key_String_val_Attributes_parent",
+    "Lang_32_workspace_objdump_d4j_full_lang_32_src_main_java_org_apache_commons_lang3_builder_HashCodeBuilder_java_boolean_isRegistered_Object_value",
+    "Math_35_workspace_objdump_d4j_full_math_35_src_main_java_org_apache_commons_math3_genetics_ElitisticListPopulation_java_ElitisticListPopulation_int_populationLimit_double_elitismRate",
+    "Math_73_workspace_objdump_d4j_full_math_73_src_main_java_org_apache_commons_math_analysis_solvers_BrentSolver_java_double_solve_UnivariateRealFunction_f_double_min_double_max",
+    "Math_80_workspace_objdump_d4j_full_math_80_src_main_java_org_apache_commons_math_linear_EigenDecompositionImpl_java_boolean_flipIfWarranted_int_n_int_step",
+    "Math_96_workspace_objdump_d4j_full_math_96_src_java_org_apache_commons_math_complex_Complex_java_boolean_equals_Object_other",
+    "Cli_10_workspace_objdump_d4j_full_fresh_cli_10_src_java_org_apache_commons_cli_Parser_java_CommandLine_parse_Options_options_String_arguments_Properties_properties_boolean_stopAtNonOption",
+    "Cli_18_workspace_objdump_d4j_full_fresh_cli_18_src_java_org_apache_commons_cli_PosixParser_java_String_flatten_Options_options_String_arguments_boolean_stopAtNonOption",
+    "Cli_32_workspace_objdump_d4j_full_fresh_cli_32_src_main_java_org_apache_commons_cli_HelpFormatter_java_int_findWrapPos_String_text_int_width_int_startPos",
+    "Closure_114_workspace_objdump_d4j_full_fresh_closure_114_src_com_google_javascript_jscomp_NameAnalyzer_java_void_visit_NodeTraversal_t_Node_n_Node_parent",
+    "Closure_74_workspace_objdump_d4j_full_fresh_closure_74_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldBinaryOperator_Node_subtree",
+    "Closure_78_workspace_objdump_d4j_full_fresh_closure_78_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldArithmeticOp_Node_n_Node_left_Node_right",
+    "Closure_97_workspace_objdump_d4j_full_fresh_closure_97_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldBinaryOperator_Node_subtree",
+    "Codec_4_workspace_objdump_d4j_full_codec_4_src_java_org_apache_commons_codec_binary_Base64_java_byte_encodeBase64_byte_binaryData_boolean_isChunked_boolean_urlSafe_int_maxResultSize",
+    "Jsoup_38_workspace_objdump_d4j_full_jsoup_38_src_main_java_org_jsoup_parser_HtmlTreeBuilderState_java_boolean_process_Token_t_HtmlTreeBuilder_tb",
+    "Jsoup_46_workspace_objdump_d4j_full_jsoup_46_src_main_java_org_jsoup_nodes_Entities_java_void_escape_StringBuilder_accum_String_string_Document_OutputSettings_out_boolean_inAttribute_boolean_normaliseWhite_boolean_stripLeadingWhite",
+)
 MINI_VALIDATION_SAMPLING_MODE = "deterministic_cap"
 MINI_VALIDATION_LIMIT = 30
 MINI_VALIDATION_SAMPLING_SEED = 42
@@ -358,6 +379,7 @@ def _build_nl2_evalplus_command(
 def _build_defects4j_expecto_command(
     run_dir: Path,
     limit: int | None,
+    sample_ids: Sequence[str] | None = None,
     validation_sampling_mode: str | None = None,
     validation_positive_cap: int | None = None,
     validation_negative_cap: int | None = None,
@@ -379,7 +401,10 @@ def _build_defects4j_expecto_command(
         "--dsl",
         "--use_test_cases",
     ]
-    if limit is not None:
+    serialized_sample_ids = _serialize_sample_ids(sample_ids)
+    if serialized_sample_ids is not None:
+        args.extend(["--sample-ids", serialized_sample_ids])
+    elif limit is not None:
         args.extend(["--limit", str(limit)])
     _append_validation_sampling_args(
         args,
@@ -395,6 +420,7 @@ def _build_defects4j_nl2_command(
     variant_name: str,
     run_dir: Path,
     limit: int | None,
+    sample_ids: Sequence[str] | None = None,
 ) -> tuple[str, ...]:
     nl2_variant = "base" if variant_name == "nl2_base" else "simple"
     args = [
@@ -405,7 +431,10 @@ def _build_defects4j_nl2_command(
         "--variant",
         nl2_variant,
     ]
-    if limit is not None:
+    serialized_sample_ids = _serialize_sample_ids(sample_ids)
+    if serialized_sample_ids is not None:
+        args.extend(["--sample-ids", serialized_sample_ids])
+    elif limit is not None:
         args.extend(["--limit", str(limit)])
     return tuple(args)
 
@@ -487,6 +516,7 @@ def _make_defects4j_expecto_unit(
     layout: ArtifactLayout,
     rq: str,
     limit: int | None,
+    sample_ids: Sequence[str] | None = None,
     validation_sampling_mode: str | None = None,
     validation_positive_cap: int | None = None,
     validation_negative_cap: int | None = None,
@@ -504,6 +534,7 @@ def _make_defects4j_expecto_unit(
         command=_build_defects4j_expecto_command(
             run_dir,
             limit,
+            sample_ids,
             validation_sampling_mode,
             validation_positive_cap,
             validation_negative_cap,
@@ -521,6 +552,7 @@ def _make_defects4j_nl2_unit(
     variant_name: str,
     rq: str,
     limit: int | None,
+    sample_ids: Sequence[str] | None = None,
 ) -> ExperimentUnit:
     run_dir = _run_dir(layout, "defects4j", variant_name)
     return ExperimentUnit(
@@ -529,7 +561,12 @@ def _make_defects4j_nl2_unit(
         benchmark="defects4j",
         variant=variant_name,
         run_dir=run_dir,
-        command=_build_defects4j_nl2_command(variant_name, run_dir, limit),
+        command=_build_defects4j_nl2_command(
+            variant_name,
+            run_dir,
+            limit,
+            sample_ids,
+        ),
         marker_kind="nl2_defects4j",
     )
 
@@ -541,6 +578,7 @@ def build_rq_units(
     limit: int | None = None,
     evalplus_sample_ids: dict[str, Sequence[str]] | None = None,
     defects4j_limit: int | None = None,
+    defects4j_sample_ids: Sequence[str] | None = None,
     validation_sampling_mode: str | None = None,
     validation_positive_cap: int | None = None,
     validation_negative_cap: int | None = None,
@@ -612,12 +650,31 @@ def build_rq_units(
         )
         units.extend(
             [
-                _make_defects4j_expecto_unit(layout, rq, effective_defects4j_limit, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts),
-                _make_defects4j_nl2_unit(
-                    layout, "nl2_base", rq, effective_defects4j_limit
+                _make_defects4j_expecto_unit(
+                    layout,
+                    rq,
+                    effective_defects4j_limit,
+                    defects4j_sample_ids,
+                    validation_sampling_mode,
+                    validation_positive_cap,
+                    validation_negative_cap,
+                    validation_sampling_seed,
+                    expecto_n_completions,
+                    expecto_max_attempts,
                 ),
                 _make_defects4j_nl2_unit(
-                    layout, "nl2_simple", rq, effective_defects4j_limit
+                    layout,
+                    "nl2_base",
+                    rq,
+                    effective_defects4j_limit,
+                    defects4j_sample_ids,
+                ),
+                _make_defects4j_nl2_unit(
+                    layout,
+                    "nl2_simple",
+                    rq,
+                    effective_defects4j_limit,
+                    defects4j_sample_ids,
                 ),
             ]
         )
@@ -925,7 +982,7 @@ def _run_mini_profile_by_rq(
             layout,
             rq,
             evalplus_sample_ids=MINI_EVALPLUS_SAMPLE_IDS,
-            defects4j_limit=MINI_DEFECTS4J_LIMIT,
+            defects4j_sample_ids=MINI_DEFECTS4J_SAMPLE_IDS,
             **_validation_sampling_kwargs(MINI_VALIDATION_LIMIT),
         )
         execute_units(units, force=force, dry_run=dry_run)
@@ -991,6 +1048,12 @@ def full(output_root: Path, force: bool, dry_run: bool) -> None:
     default=None,
     help="Optional override for Expecto --max_attempts in this run.",
 )
+@click.option(
+    "--mini",
+    "mini_mode",
+    is_flag=True,
+    help="Run this RQ with the fixed mini profile under mini/ outputs.",
+)
 @click.option("--force", is_flag=True, help="Rerun completed experiment units.")
 @click.option("--dry-run", is_flag=True, help="Print commands without executing them.")
 def rq(
@@ -1000,20 +1063,38 @@ def rq(
     validation_limit: int | None,
     expecto_n_completions: int | None,
     expecto_max_attempts: int | None,
+    mini_mode: bool,
     force: bool,
     dry_run: bool,
 ) -> None:
     """Run one research question."""
 
-    layout = _layout(output_root, STANDARD_PROFILE_NAME)
+    if mini_mode and limit is not None:
+        raise click.UsageError("--mini cannot be combined with --limit.")
+    if mini_mode and validation_limit is not None:
+        raise click.UsageError("--mini cannot be combined with --validation-limit.")
+
+    layout = _layout(
+        output_root,
+        MINI_PROFILE_NAME if mini_mode else STANDARD_PROFILE_NAME,
+    )
     _print_summary(layout)
+    build_kwargs: dict[str, object] = {
+        "expecto_n_completions": expecto_n_completions,
+        "expecto_max_attempts": expecto_max_attempts,
+    }
+    if mini_mode:
+        build_kwargs["evalplus_sample_ids"] = MINI_EVALPLUS_SAMPLE_IDS
+        build_kwargs["defects4j_sample_ids"] = MINI_DEFECTS4J_SAMPLE_IDS
+        build_kwargs.update(_validation_sampling_kwargs(MINI_VALIDATION_LIMIT))
+    else:
+        build_kwargs["limit"] = limit
+        build_kwargs.update(_validation_sampling_kwargs(validation_limit))
+
     units = build_rq_units(
         layout,
         rq,
-        limit=limit,
-        **_validation_sampling_kwargs(validation_limit),
-        expecto_n_completions=expecto_n_completions,
-        expecto_max_attempts=expecto_max_attempts,
+        **build_kwargs,
     )
     execute_units(units, force=force, dry_run=dry_run)
     generate_figures_for_rq(layout, rq, force=force, dry_run=dry_run)

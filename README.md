@@ -9,7 +9,7 @@ The paper studies the following four research questions:
 - `RQ3` How do test cases and SMT-based validation contribute to the performance of Expecto?
 - `RQ4` Can Expecto be practically applied to detect functional bugs in real-world software?
 
-The artifact entrypoint is [`./scripts/run_artifact.py`](./scripts/run_artifact.py).
+The artifact entrypoint is [`./scripts/run_artifact.py`](file:///workspace/expecto-artifact/scripts/run_artifact.py).
 
 ## 1. Getting started
 ### System requirements
@@ -23,25 +23,34 @@ In the paper, the experiments were conducted with:
 
 ### Setup with Docker
 
-1. Build the Docker image:
+**1. Pull/Build the Docker image:**
 
+Pull:
 ```bash
-docker build -t expecto-artifact .
-docker run -it \
-  --name expecto-artifact \
-  expecto-artifact \
-  zsh
+docker pull prosyslab/expecto-artifact
 ```
 
-2. Inside the container, create `.env` in `/workspace/expecto-artifact`:
+Build:
+```bash
+git clone https://github.com/prosyslab/expecto-artifact
+cd expecto-artifact
+docker build -t expecto-artifact .
+```
+
+**2. Run the container:**
+```bash
+docker run -it --name expecto-artifact expecto-artifact zsh
+```
+
+**3. Inside the container, create `.env` in `/workspace/expecto-artifact` and set the API key:**
 
 ```bash
 cat > .env <<'EOF'
-OPENAI_API_KEY=sk-YOUR_KEY_HERE
+OPENAI_API_KEY=YOUR_KEY_HERE
 EOF
 ```
 
-3. Before running the artifact, download the dataset bundle from Zenodo and extract it at the repository root.
+**4. Before running the artifact, download the dataset bundle from Zenodo and extract it at the repository root.**
 
 Replace the placeholder URL below with the final Zenodo URL when it is available:
 
@@ -53,10 +62,10 @@ tar -xzf datasets.tar.gz
 
 After extraction, the repository should contain the `datasets/` directory with the benchmark files used by the artifact.
 
-4. Run the smoke test once to confirm that the setup is complete:
+**5. Run the test to confirm that the setup is complete (takes about 2 minutes):**
 
 ```bash
-python3 scripts/test.py (takes about 2 minutes)
+python3 scripts/test.py 
 ```
 
 Expected output:
@@ -134,7 +143,7 @@ All commands below use `/workspace/data/experiment/artifact` as the default `--o
 The main artifact runner supports four modes:
 
 - `full`: run all experiment units needed for `RQ1`-`RQ4`, then generate all figures and tables under `full/figures/`
-- `rq`: run only one research question and generate only that RQ's outputs under `full/figures/rq*/`
+- `rq`: run only one research question and generate only that RQ's outputs under `full/figures/rq*/`, or under `mini/figures/rq*/` when `--mini` is used
 - `mini`: run a reduced sample sweep and write the reduced results under `mini/`
 - `target`: run one benchmark-specific experiment unit only and write only its raw run directory
 
@@ -155,6 +164,7 @@ Use the commands in this order if you want a predictable review path:
 - Inspect the workflow without executing it first: `python3 scripts/run_artifact.py full --dry-run`
 - Reproduce the full paper claims first: `python3 scripts/run_artifact.py full`
 - Reproduce one paper claim in detail with `rq --rq ...`
+- Reproduce one paper claim with the fixed mini subsets when needed: `rq --rq ... --mini`
 - Run the reduced smoke test separately when needed: `python3 scripts/run_artifact.py mini`
 - If one unit failed or you want to inspect one cell of a paper figure/table, rerun just that unit with `target`
 
@@ -182,7 +192,6 @@ python3 scripts/run_artifact.py full --dry-run
 What this command does:
 
 - Runs all raw experiment units needed for `RQ1`-`RQ4`
-- Deduplicates shared units across RQs
 - Generates all tables and figures after the runs finish
 
 Where the results are stored:
@@ -192,11 +201,11 @@ Where the results are stored:
   - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/`
   - `/workspace/data/experiment/artifact/full/runs/defects4j/`
 - Final outputs (paper mapping):
-    - [`Table 1 (RQ1 main comparison)`](/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf)
-    - [`Fig. 8 (RQ1 threshold analysis)`](/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf)
-    - [`Fig. 9 (RQ2 generation algorithm ablation)`](/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf)
-    - [`Fig. 10 (RQ3 test-case and SMT-based validation ablation)`](/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf)
-    - [`Table 2 (RQ4 Defects4J comparison)`](/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf)
+    - [`Table 1 (RQ1 main comparison)`](file:///workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf)
+    - [`Fig. 8 (RQ1 threshold analysis)`](file:///workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf)
+    - [`Fig. 9 (RQ2 generation algorithm ablation)`](file:///workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf)
+    - [`Fig. 10 (RQ3 test-case and SMT-based validation ablation)`](file:///workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf)
+    - [`Table 2 (RQ4 Defects4J comparison)`](file:///workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf)
 
 What to check:
 
@@ -205,6 +214,16 @@ What to check:
 
 ### Reproduce one paper claim at a time: `rq`
 Use `rq` when you want one paper result and its associated outputs without running the full artifact.
+
+> **Note:** If you have already completed the `full` run, all figures and tables for the paper will have been generated. There is no need to run `rq` separately unless you want to rerun or inspect a specific research question in detail.
+
+Run one RQ with the fixed mini profile:
+
+```bash
+python3 scripts/run_artifact.py rq --rq rq4 --mini
+```
+
+This uses the same fixed mini subsets as `mini`, but only for the requested RQ, and writes outputs under `/workspace/data/experiment/artifact/mini`.
 
 #### RQ1. Effectiveness of Expecto in formal specification generation
 Run `RQ1`:
@@ -224,8 +243,8 @@ Where the results are stored:
   - `/workspace/data/experiment/artifact/full/runs/apps/{ts,nl2_base,nl2_simple}`
   - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,nl2_base,nl2_simple}`
 - Outputs (paper mapping):
-    - [`Table 1`](/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf)
-    - [`Fig. 8`](/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf)
+    - [`Table 1 (RQ1 main comparison)`](file:///workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf)
+    - [`Fig. 8 (RQ1 threshold analysis)`](file:///workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf)
 
 How this maps to the paper:
 
@@ -257,7 +276,7 @@ Where the results are stored:
   - `/workspace/data/experiment/artifact/full/runs/apps/{mono,topdown,ts}`
   - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{mono,topdown,ts}`
 - Outputs (paper mapping):
-    - [`Fig. 9`](/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf)
+    - [`Fig. 9 (RQ2 generation algorithm ablation)`](file:///workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf)
 
 How this maps to the paper:
 
@@ -288,7 +307,7 @@ Where the results are stored:
   - `/workspace/data/experiment/artifact/full/runs/apps/{ts,without_tc,without_smt}`
   - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/{ts,without_tc,without_smt}`
 - Outputs (paper mapping):
-    - [`Fig. 10`](/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf)
+    - [`Fig. 10 (RQ3 test-case and SMT-based validation ablation)`](file:///workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf)
 
 How this maps to the paper:
 
@@ -319,7 +338,7 @@ Where the results are stored:
 - Raw runs:
   - `/workspace/data/experiment/artifact/full/runs/defects4j/{expecto,nl2_base,nl2_simple}`
 - Output (paper mapping):
-    - [`Table 2`](/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf)
+    - [`Table 2 (RQ4 Defects4J comparison)`](file:///workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf)
 
 How this maps to the paper:
 
@@ -340,18 +359,15 @@ Run the reduced sweep:
 python3 scripts/run_artifact.py mini
 ```
 
-Preview the reduced sweep without executing:
-
-```bash
-python3 scripts/run_artifact.py mini --dry-run
-```
-
 What this command does:
 
 - Runs the same experiment families as `full`, but uses fixed benchmark subsets for the EvalPlus-style benchmarks instead of a prefix limit
 - Uses these 20 APPS problem IDs: `15, 57, 23, 76, 83, 39, 101, 3701, 4004, 37, 94, 16, 61, 52, 42, 47, 72, 90, 4005, 71`
 - Uses these 20 HumanEval+ problem IDs: `22, 52, 75, 61, 83, 92, 34, 53, 73, 129, 140, 158, 54, 124, 6, 71, 32, 123, 162, 63`
-- Keeps Defects4J on the existing reduced-limit path with an internal limit of `5`
+- Uses these 20 Defects4J task IDs:
+```
+Chart_6_workspace_objdump_d4j_full_fresh_chart_6_source_org_jfree_chart_util_ShapeList_java_boolean_equals_Object_obj, Cli_18_workspace_objdump_d4j_full_fresh_cli_18_src_java_org_apache_commons_cli_PosixParser_java_void_processOptionToken_String_token_boolean_stopAtNonOption, Compress_40_workspace_objdump_d4j_full_compress_40_src_main_java_org_apache_commons_compress_utils_BitInputStream_java_long_readBits_int_count, Jsoup_76_workspace_objdump_d4j_full_jsoup_76_src_main_java_org_jsoup_parser_HtmlTreeBuilderState_java_boolean_process_Token_t_HtmlTreeBuilder_tb, Jsoup_85_workspace_objdump_d4j_full_jsoup_85_src_main_java_org_jsoup_nodes_Attribute_java_Attribute_String_key_String_val_Attributes_parent, Lang_32_workspace_objdump_d4j_full_lang_32_src_main_java_org_apache_commons_lang3_builder_HashCodeBuilder_java_boolean_isRegistered_Object_value, Math_35_workspace_objdump_d4j_full_math_35_src_main_java_org_apache_commons_math3_genetics_ElitisticListPopulation_java_ElitisticListPopulation_int_populationLimit_double_elitismRate, Math_73_workspace_objdump_d4j_full_math_73_src_main_java_org_apache_commons_math_analysis_solvers_BrentSolver_java_double_solve_UnivariateRealFunction_f_double_min_double_max, Math_80_workspace_objdump_d4j_full_math_80_src_main_java_org_apache_commons_math_linear_EigenDecompositionImpl_java_boolean_flipIfWarranted_int_n_int_step, Math_96_workspace_objdump_d4j_full_math_96_src_java_org_apache_commons_math_complex_Complex_java_boolean_equals_Object_other, Cli_10_workspace_objdump_d4j_full_fresh_cli_10_src_java_org_apache_commons_cli_Parser_java_CommandLine_parse_Options_options_String_arguments_Properties_properties_boolean_stopAtNonOption, Cli_18_workspace_objdump_d4j_full_fresh_cli_18_src_java_org_apache_commons_cli_PosixParser_java_String_flatten_Options_options_String_arguments_boolean_stopAtNonOption, Cli_32_workspace_objdump_d4j_full_fresh_cli_32_src_main_java_org_apache_commons_cli_HelpFormatter_java_int_findWrapPos_String_text_int_width_int_startPos, Closure_114_workspace_objdump_d4j_full_fresh_closure_114_src_com_google_javascript_jscomp_NameAnalyzer_java_void_visit_NodeTraversal_t_Node_n_Node_parent, Closure_74_workspace_objdump_d4j_full_fresh_closure_74_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldBinaryOperator_Node_subtree, Closure_78_workspace_objdump_d4j_full_fresh_closure_78_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldArithmeticOp_Node_n_Node_left_Node_right, Closure_97_workspace_objdump_d4j_full_fresh_closure_97_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldBinaryOperator_Node_subtree, Codec_4_workspace_objdump_d4j_full_codec_4_src_java_org_apache_commons_codec_binary_Base64_java_byte_encodeBase64_byte_binaryData_boolean_isChunked_boolean_urlSafe_int_maxResultSize, Jsoup_38_workspace_objdump_d4j_full_jsoup_38_src_main_java_org_jsoup_parser_HtmlTreeBuilderState_java_boolean_process_Token_t_HtmlTreeBuilder_tb, Jsoup_46_workspace_objdump_d4j_full_jsoup_46_src_main_java_org_jsoup_nodes_Entities_java_void_escape_StringBuilder_accum_String_string_Document_OutputSettings_out_boolean_inAttribute_boolean_normaliseWhite_boolean_stripLeadingWhite
+```
 - Generates reduced outputs for `RQ1`-`RQ4`
 - Writes everything under `/workspace/data/experiment/artifact/mini`
 
@@ -395,65 +411,3 @@ Where the results are stored:
 
 - `apps` and `humaneval_plus` targets: `/workspace/data/experiment/artifact/full/runs/<benchmark>/<variant>`
 - `defects4j` targets: `/workspace/data/experiment/artifact/full/runs/defects4j/<variant>`
-
-How this maps to the paper:
-
-- `--benchmark apps --family rq2 --variant topdown`: the APPS / TopDown cell inside the `§4.3` ablation
-- `--benchmark humaneval_plus --family rq3 --variant without_smt`: the HumanEval+ / `without_smt` ablation tied to `§4.4` and `§3.4`
-- `--benchmark defects4j --family rq4 --variant nl2_base`: the Defects4J / NL2Postcond Base comparison unit in `§4.5`
-
-What to check:
-
-- The expected completion marker appears in the target run directory
-- `target` is the right command when one unit was interrupted and you do not want to rerun the whole RQ or full artifact
-
----
-## 4. Claims supported by the artifact
-The artifact supports the following paper claims:
-
-- `RQ1` (`§4.2`): Expecto outperforms NL2Postcond `Base` and `Simple` on formal specification generation for `HumanEval+` and `APPS`. Reproduce with `python3 scripts/run_artifact.py rq --rq rq1` or `full`.
-- `RQ2` (`§4.3`): the top-down decomposition and tree search are both important contributors to Expecto's performance. Reproduce with `python3 scripts/run_artifact.py rq --rq rq2` or `full`.
-- `RQ3` (`§4.4`, linked to `§3.4`): both test cases and SMT-based validation improve robustness. Reproduce with `python3 scripts/run_artifact.py rq --rq rq3` or `full`.
-- `RQ4` (`§4.5`): Expecto is effective for bug detection on `Defects4J`. Reproduce with `python3 scripts/run_artifact.py rq --rq rq4` or `full`.
-- Reuse claim: the source, benchmark wrappers, and figure-generation scripts needed to rerun and extend the evaluation are included in this repository.
-
-The artifact does not directly support the following claims as standalone push-button outputs:
-
-- The qualitative example figures `Fig. 7`, `Fig. 11`, and `Fig. 12` are discussed in the paper, but `run_artifact.py` does not regenerate them as dedicated outputs. The artifact focuses on the quantitative evaluation claims in `§4.2`-`§4.5`.
-- `mini` is a reduced check profile and is not intended to reproduce the exact final paper numbers.
-
----
-## 5. Experimental setting from the paper
-The paper evaluates Expecto on three benchmarks:
-
-- `HumanEval+`: 164 Python problems
-- `APPS`: 127 selected problems with at least 100 test cases
-- `Defects4J`: 336 methods selected from 501 bugs reproducible on Java 8+
-
-Natural language inputs used in the paper:
-
-- HumanEval+ and APPS: problem descriptions
-- Defects4J: method-level Javadoc comments
-
-Baseline used in the paper:
-
-- NL2Postcond `Base`
-- NL2Postcond `Simple`
-
----
-## 6. Reuse, force, and output management
-The artifact runner checks whether a unit has already completed before launching it again.
-
-- Expecto units are considered complete when `evaluation_result/manifest.json` exists.
-- HumanEval+/APPS NL2Postcond units are considered complete when `aggregated_result.json` exists.
-- Defects4J NL2Postcond units are considered complete when `validation/aggregated.json` exists.
-
-Examples:
-
-```bash
-python3 scripts/run_artifact.py full
-python3 scripts/run_artifact.py full --force
-python3 scripts/run_artifact.py rq --rq rq3 --force
-```
-
-The `mini` profile is stored separately from the `full` profile so that reduced runs do not pollute the main outputs.
