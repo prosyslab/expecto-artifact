@@ -161,12 +161,9 @@ The raw run directories are considered complete when the following marker files 
 ### Recommended usage flow
 Use the commands in this order if you want a predictable review path:
 
-- Inspect the workflow without executing it first: `python3 scripts/run_artifact.py full --dry-run`
-- Reproduce the full paper claims first: `python3 scripts/run_artifact.py full`
-- Reproduce one paper claim in detail with `rq --rq ...`
-- Reproduce one paper claim with the fixed mini subsets when needed: `rq --rq ... --mini`
-- Run the reduced smoke test separately when needed: `python3 scripts/run_artifact.py mini`
-- If one unit failed or you want to inspect one cell of a paper figure/table, rerun just that unit with `target`
+1. Reproduce the full paper claims first: `python3 scripts/run_artifact.py full` (takes about 50 hours)
+2. Check the paper-mapped outputs under `full/figures/`
+3. Check the claims for each RQ described in RQ1-RQ4 sections below.
 
 ### Full paper reproduction: `full`
 Run everything:
@@ -217,10 +214,10 @@ Use `rq` when you want one paper result and its associated outputs without runni
 
 > **Note:** If you have already completed the `full` run, all figures and tables for the paper will have been generated. There is no need to run `rq` separately unless you want to rerun or inspect a specific research question in detail.
 
-Run one RQ with the fixed mini profile:
+Run one RQ with the fixed mini profile (`RQ_NUMBER` can be `rq1`, `rq2`, `rq3`, or `rq4`):
 
 ```bash
-python3 scripts/run_artifact.py rq --rq rq4 --mini
+python3 scripts/run_artifact.py rq --rq <RQ_NUMBER> --mini
 ```
 
 This uses the same fixed mini subsets as `mini`, but only for the requested RQ, and writes outputs under `/workspace/data/experiment/artifact/mini`.
