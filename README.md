@@ -56,7 +56,7 @@ After extraction, the repository should contain the `datasets/` directory with t
 4. Run the smoke test once to confirm that the setup is complete:
 
 ```bash
-python3 scripts/test.py
+python3 scripts/test.py (takes about 2 minutes)
 ```
 
 Expected output:
