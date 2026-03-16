@@ -179,6 +179,27 @@ def _classify_expecto_sample(sample: Sample) -> str:
     return "wrong"
 
 
+def _category_label(category: str) -> str:
+    labels = {
+        "sound_and_complete": "S&C",
+        "sound_only": "S",
+        "complete_only": "C",
+        "wrong": "W",
+        "SC": "S&C",
+        "S": "S",
+        "C": "C",
+        "W": "W",
+    }
+    return labels.get(category, category)
+
+
+def _normalize_exported_sample_id(benchmark: str, sample_id: Any) -> str:
+    normalized = str(sample_id).strip()
+    if benchmark == "humaneval_plus" and normalized.startswith("HumanEval/"):
+        return normalized.split("/", 1)[1]
+    return normalized
+
+
 class LLMCallRow(BaseModel):
     benchmark: str
     exp_name: str
@@ -1071,6 +1092,172 @@ def collect_defects4j_nl2_data(run_dir: Path) -> dict[str, Any]:
             f"but found {len(aggregate_files)}"
         )
     return cast(dict[str, Any], json.loads(aggregate_files[0].read_text()))
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            payload = json.loads(stripped)
+            if isinstance(payload, dict):
+                rows.append(cast(dict[str, Any], payload))
+    return rows
+
+
+def collect_defects4j_nl2_rows(run_dir: Path) -> list[dict[str, Any]]:
+    final_jsonl_paths = sorted((run_dir / "validation").glob("*.final.jsonl"))
+    if not final_jsonl_paths:
+        raise click.ClickException(
+            f"No Defects4J NL2Postcond final JSONL outputs found under {run_dir}"
+        )
+
+    rows: list[dict[str, Any]] = []
+    for final_jsonl_path in final_jsonl_paths:
+        rows.extend(_read_jsonl(final_jsonl_path))
+    return rows
+
+
+def _extract_expecto_completion_payload(sample: Sample) -> Any:
+    inspect_sample = sample.inspect_ai_sample
+    output = getattr(inspect_sample, "output", None)
+    completion = getattr(output, "completion", None) if output is not None else None
+    if isinstance(completion, str):
+        stripped = completion.strip()
+        if not stripped:
+            return None
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            return stripped
+    return completion
+
+
+def _extract_expecto_postcondition(sample: Sample) -> str:
+    payload = _extract_expecto_completion_payload(sample)
+    if isinstance(payload, Mapping):
+        generated_codes = payload.get("generated_codes")
+        if isinstance(generated_codes, Sequence) and not isinstance(
+            generated_codes, (str, bytes, bytearray)
+        ):
+            codes = [str(code).strip() for code in generated_codes if str(code).strip()]
+            if codes:
+                return "\n\n".join(codes)
+    if isinstance(payload, str):
+        return payload
+    return ""
+
+
+def _sample_id_from_expecto_sample(sample: Sample) -> str:
+    inspect_sample = sample.inspect_ai_sample
+    sample_id = getattr(inspect_sample, "id", None)
+    return str(sample_id) if sample_id is not None else ""
+
+
+def build_expecto_sample_rows(
+    data: EvaluationResult,
+    *,
+    benchmark: str,
+    variant: str,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for sample in data.results:
+        category = _classify_expecto_sample(sample)
+        rows.append(
+            {
+                "id": _normalize_exported_sample_id(
+                    benchmark, _sample_id_from_expecto_sample(sample)
+                ),
+                "classification": _category_label(category),
+                "postcondition": _extract_expecto_postcondition(sample),
+            }
+        )
+    return rows
+
+
+def build_evalplus_nl2_sample_rows(
+    run_dir: Path,
+    *,
+    benchmark: str,
+    variant: str,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for eval_data, _ in collect_nl2_postcond_data(run_dir):
+        for entry in eval_data:
+            is_sound = bool(entry.get("is_sound", False))
+            is_complete = bool(entry.get("is_complete", False))
+            if is_sound and is_complete:
+                category = "S&C"
+            elif is_sound:
+                category = "S"
+            elif is_complete:
+                category = "C"
+            else:
+                category = "W"
+            rows.append(
+                {
+                    "id": _normalize_exported_sample_id(
+                        benchmark, entry.get("task_id", entry.get("id", ""))
+                    ),
+                    "classification": category,
+                    "postcondition": str(entry.get("assertion", "")),
+                }
+            )
+    return rows
+
+
+def build_defects4j_nl2_sample_rows(
+    run_dir: Path,
+    *,
+    benchmark: str,
+    variant: str,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for entry in collect_defects4j_nl2_rows(run_dir):
+        category = _category_label(str(entry.get("category", "W")))
+        rows.append(
+            {
+                "id": _normalize_exported_sample_id(benchmark, entry.get("id", "")),
+                "classification": category,
+                "postcondition": str(entry.get("assertion", "")),
+            }
+        )
+    return rows
+
+
+def export_target_sample_json(
+    run_dir: Path,
+    *,
+    benchmark: str,
+    variant: str,
+    output_path: Path | None = None,
+) -> Path:
+    if variant.startswith("nl2_"):
+        if benchmark == "defects4j":
+            rows = build_defects4j_nl2_sample_rows(
+                run_dir, benchmark=benchmark, variant=variant
+            )
+        else:
+            rows = build_evalplus_nl2_sample_rows(
+                run_dir, benchmark=benchmark, variant=variant
+            )
+    else:
+        expecto_result_dir = run_dir / "evaluation_result"
+        expecto_data = asyncio.run(collect_expecto_data(expecto_result_dir))
+        rows = build_expecto_sample_rows(
+            expecto_data, benchmark=benchmark, variant=variant
+        )
+
+    rows.sort(key=lambda row: row["id"])
+    destination = output_path or (run_dir / "sample_results.json")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(rows, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return destination
 
 
 async def collect_expecto_data(run_dir: Path) -> EvaluationResult:
@@ -1967,6 +2154,45 @@ def draw_llm_call_table(config_path: str, output_path: str, caption: str, label:
     click.echo(
         f"Saved LLM call table to {output_file} and {output_pdf} (source={source_kind})"
     )
+
+
+@cli.command(name="export-target-sample-json")
+@click.argument(
+    "run_dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+)
+@click.option(
+    "--benchmark",
+    type=click.Choice(("apps", "humaneval_plus", "defects4j")),
+    required=True,
+)
+@click.option(
+    "--variant",
+    type=click.Choice(
+        ("mono", "topdown", "ts", "without_tc", "nl2_base", "nl2_simple")
+    ),
+    required=True,
+)
+@click.option(
+    "--output-path",
+    type=click.Path(file_okay=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional JSON path. Defaults to <run_dir>/sample_results.json.",
+)
+def export_target_sample_json_command(
+    run_dir: Path,
+    benchmark: str,
+    variant: str,
+    output_path: Path | None,
+):
+    output_file = export_target_sample_json(
+        run_dir,
+        benchmark=benchmark,
+        variant=variant,
+        output_path=output_path,
+    )
+    click.echo(f"Wrote {output_file}")
 
 
 if __name__ == "__main__":

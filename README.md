@@ -132,8 +132,9 @@ Generated outputs from the artifact runner are written under:
 # 3. Reproducing specific benchmark problems
 This section explains how to generate and evaluate a specific benchmark problem with a specific configuration.
 In the paper, we used three different benchmarks, four Expecto variant configurations, and two NL2Postcond variant configurations.
-This section describes how to run each benchmark by specifying the problem ID for any of the 3 x (4 + 2) = 18 combinations.
+This section shows how to run any benchmark by specifying the problem ID for each of the 3 x (4 + 2) = 18 possible combinations.
 
+## 3.1 How to run
 ```bash
 python3 scripts/run_artifact.py target \
   --benchmark <BENCHMARK> \
@@ -144,145 +145,85 @@ python3 scripts/run_artifact.py target \
 - `BENCHMARK` specifies which benchmark to generate. You can choose one of `apps`, `humaneval_plus`, or `defects4j`.
 - `VARIANT` specifies the Expecto or NL2Postcond configuration used in the paper.
   - For Expecto, the following four configurations are available:
-    1. `mono`: the monolithic synthesis without top-down decomposition or tree search (Section 4.3 in the paper)
-    2. `topdown`: the top-down synthesis without tree search (Section 4.3 in the paper)
-    3. `ts`: the top-down synthesis with tree search (Sections 4.2, 4.3, 4.4, and 4.5 in the paper)
-    4. `without_tc`: the top-down tree-search synthesis without test cases (Section 4.4 in the paper)
+    1. `mono`: the monolithic synthesis without top-down decomposition or tree search (section 4.3 in the paper)
+    2. `topdown`: the top-down synthesis without tree search (section 4.3 in the paper)
+    3. `ts`: the top-down synthesis with tree search (sections 4.2, 4.3, 4.4, and 4.5 in the paper)
+    4. `without_tc`: the top-down tree-search synthesis without test cases (section 4.4 in the paper)
   - For NL2Postcond, the following two configurations are available:
-    1. `nl2_base`: the NL2Postcond base prompt strategy (Sections 4.2 and 4.5 in the paper)
-    2. `nl2_simple`: the NL2Postcond simple prompt strategy (Sections 4.2 and 4.5 in the paper)
-- `SAMPLE-IDS` specifies the IDs of the benchmark problems to generate as a comma-separated list. For example, you can provide `15,23,56`.
-  You can find the list of available problem IDs for each benchmark in `/workspace/expecto-artifact/datasets/available_target_ids.csv`.
+    1. `nl2_base`: the NL2Postcond base prompt strategy (sections 4.2 and 4.5 in the paper)
+    2. `nl2_simple`: the NL2Postcond simple prompt strategy (sections 4.2 and 4.5 in the paper)
+- `SAMPLE-IDS` specifies the IDs of the benchmark problems to generate as a comma-separated list. For example, you can provide `15,23,56`. You can find the list of available problem IDs for each benchmark in `/workspace/expecto-artifact/datasets/available_target_ids.csv`.
 
-여기서 생성하는 것은 LLM의 raw output과 테스트 케이스를 활용한 soundness 및 completeness 평가 결과입니다.
-생성물과 평가 평가 결과는 다음 경로에 저장됩니다: `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<VARIANT>`
+## 3.2 What this does
+This command generates the LLM's raw output and evaluates the generated specifications for soundness and completeness.
+The generated outputs and evaluation results are saved at `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<VARIANT>`.
+After the evaluation is complete, the `target` command also generates `/workspace/data/experiment/artifact/target/runs/<BENCHMARK>/<VARIANT>/sample_results.json`, so you can immediately inspect the classification result for each sample.
 
-## Example
+`sample_results.json` is a list of objects per sample, and each object contains the following fields:
+
+- `id`: the sample ID
+- `classification`: the sample classification result
+  - `S&C`: sound and complete
+  - `S`: sound but incomplete
+  - `C`: complete but unsound
+  - `W`: neither sound nor complete
+- `postcondition`: the generated postcondition
+  - Expecto generates postconditions in the form of `predicate spec(...) { ... }`
+  - NL2Postcond generates postconditions in the form of `assert ...`
+
+## 3.3 Example: APPS problem `75` (Running example in the paper)
+To compare Expecto (`ts`) with the two NL2Postcond variants (`nl2_base` and `nl2_simple`) on the motivating example of the paper (APPS problem `75`), run the following three commands:
 
 ```bash
 python3 scripts/run_artifact.py target \
   --benchmark apps \
   --variant ts \
-  --sample-ids 15
-```
-Expected output:
-- Runs APPS sample `15` with the full Expecto tree-search configuration.
-- Raw data:
-  - `/workspace/data/experiment/artifact/target/runs/apps/ts/`
-- Outputs:
-  - `/workspace/data/experiment/artifact/target/runs/apps/ts/evaluation_result/samples/15.json`
+  --sample-ids 75
 
-## Inspecting Expecto variants
+python3 scripts/run_artifact.py target \
+  --benchmark apps \
+  --variant nl2_base \
+  --sample-ids 75
 
-For `Expecto` variants (`mono`, `topdown`, `ts`, `without_tc`), start from the `evaluation_result/` directory.
-
-```bash
-find /workspace/data/experiment/artifact/target/runs/apps/ts/evaluation_result -maxdepth 2 -type f
-```
-Expected output:
-- Prints the files inside the Expecto `evaluation_result/` directory, including metadata and per-sample JSON files.
-- Raw data:
-  - `/workspace/data/experiment/artifact/target/runs/apps/ts/evaluation_result/`
-- Outputs:
-  - `/workspace/data/experiment/artifact/target/runs/apps/ts/evaluation_result/manifest.json`
-  - `/workspace/data/experiment/artifact/target/runs/apps/ts/evaluation_result/samples/<sample_id>.json`
-
-Typical structure:
-
-- `evaluation_result/manifest.json`: a metadata file for the run.
-- `evaluation_result/samples/<sample_id>.json`: the raw data for one target
-
-`samples/15.json` looks like this:
-
-```json
-{
-  "sample_id": "15",
-  "final_output": {
-    "iteration": 2,
-    "num_of_nodes": 4,
-    "generated_codes": [
-      "predicate spec(a: int, b: int, c: int, output: string) { ... }"
-    ],
-    "is_success": true,
-    "num_of_defined": 2,
-    "num_of_undefined": 0
-  },
-  "metadata": {
-    "problem_id": 15,
-    "difficulty": "interview",
-    "input": "## Question: Vasya likes everything infinite. ...",
-    "signature": "def postcondition(a: int, b: int, c: int, output: str): ..."
-  },
-  "scores": [
-    [
-      {
-        "scorer_name": "dsl_completeness",
-        "score": "C",
-        "explanation": "{ \"C\": 30, \"I\": 0, \"TO\": 0 }"
-      }
-    ]
-  ]
-}
+python3 scripts/run_artifact.py target \
+  --benchmark apps \
+  --variant nl2_simple \
+  --sample-ids 75
 ```
 
-Key fields:
+Each command writes its result to:
 
-- `sample_id`: sample ID of the target
-- `final_output.iteration` and `final_output.num_of_nodes`: tree-search statistics
-- `final_output.generated_codes`: the generated formal specification
-- `final_output.is_success`: whether Expecto generated specification successfully for this target
-- `metadata.input`: the original natural-language problem statement
-- `metadata.signature`: the postcondition signature Expecto tried to satisfy
-- `scores`: evaluation results for completeness and soundness
-
-## Inspecting NL2Postcond variants
-
-For `NL2Postcond` variants (`nl2_base`, `nl2_simple`), sample-level results are stored together in `evaluation_results.json`.
-
-```bash
-find /workspace/data/experiment/artifact/target/runs/apps/nl2_base -name evaluation_results.json
-```
-
-Expected output:
-- Prints one or more paths to `evaluation_results.json`, which stores the per-sample NL2Postcond evaluation results.
-- Raw data:
-  - `/workspace/data/experiment/artifact/target/runs/apps/nl2_base/`
-- Outputs:
-  - `/workspace/data/experiment/artifact/target/runs/apps/nl2_base/.../evaluation_results.json`
-
-A typical entry in `evaluation_results.json` looks like this:
-
+- `/workspace/data/experiment/artifact/target/runs/apps/ts/sample_results.json`:
 ```json
 [
   {
-    "task_id": "15",
-    "assertion": "...",
-    "is_complete": true,
-    "is_sound": true,
-    "complete_ratio": 0.0,
-    "sound_ratio": 0.0,
-    "true_cnt_correct": 178,
-    "false_cnt_correct": 0,
-    "error_cnt_correct": 0,
-    "true_cnt_mutated": 178,
-    "false_cnt_mutated": 0,
-    "error_cnt_mutated": 0,
-    "msg_completeness": "Success",
-    "msg_soundness": "Success"
-  },
-  ...
+    "id": "75",
+    "classification": "S&C",
+    "postcondition": "predicate spec(n: int, m: int, grid: list[string], out_status: string, out_x: int, out_y: int) {\n    (if (out_status == \"YES\") then\n        (((1 <= out_x <= n) ∧\n            (1 <= out_y <= m)) ∧\n            WipesOutAllWalls(grid, n, m, (out_x - 1), (out_y - 1)))\n    else\n        (¬ (∃(x: int, y: int) ::\n            (((0 <= x < n) ∧\n                (0 <= y < m)) ∧\n                WipesOutAllWalls(grid, n, m, x, y)))))\n}\n\npredicate WipesOutAllWalls(grid: list[string], n: int, m: int, x: int, y: int) {\n    (∀(i: int, j: int) ::\n        ((((0 <= i < n) ∧\n            (0 <= j < m)) ∧\n            (grid[i][j] == '*')) ==>\n            ((i == x) ∨ (j == y))))\n}"
+  }
+]
+```
+- `/workspace/data/experiment/artifact/target/runs/apps/nl2_base/sample_results.json`:
+```json
+[
+  {
+    "id": "75",
+    "classification": "S",
+    "postcondition": "assert out_status == 'NO' and all((any((grid[i][j] == '*' for i in range(n) if i != r)) and any((grid[r][j] == '*' for j in range(m) if j != c)) for r in range(n) for c in range(m))) or (out_status == 'YES' and 1 <= out_x <= n and (1 <= out_y <= m) and all((grid[i][j] != '*' or i == out_x - 1 or j == out_y - 1 for i in range(n) for j in range(m))))"
+  }
 ]
 ```
 
-Key fields:
-
-- `task_id`: the sample ID of the target
-- `assertion`: the generated postcondition assertion
-- `is_complete`: whether the assertion was complete on the evaluation set
-- `is_sound`: whether the assertion was sound on the evaluation set
-- `complete_ratio` and `sound_ratio`: the fraction of test cases that passed the completeness and soundness checks
-- `true_cnt_correct`, `false_cnt_correct`, and `error_cnt_correct`: counts for correct test cases
-- `msg_completeness` and `msg_soundness`: stderr messages from the evaluation
+- `/workspace/data/experiment/artifact/target/runs/apps/nl2_simple/sample_results.json`:
+```json
+[
+  {
+    "id": "75",
+    "classification": "C",
+    "postcondition": "assert out_status == 'NO' or all((grid[i][out_y - 1] != '*' or grid[out_x - 1][j] != '*' or (i == out_x - 1 or j == out_y - 1) for i in range(n) for j in range(m) if grid[i][j] == '*'))"
+  }
+]
+```
 
 # 4. Reproducing the full paper results
 

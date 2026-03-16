@@ -777,6 +777,20 @@ def _run_subprocess(args: Sequence[str]) -> None:
     subprocess.run(args, cwd=PROJECT_ROOT, check=True)
 
 
+def _export_target_sample_json(unit: ExperimentUnit) -> None:
+    json_args = (
+        PYTHON_BIN,
+        _click_path(FIGURE_GENERATOR),
+        "export-target-sample-json",
+        _click_path(unit.run_dir),
+        "--benchmark",
+        unit.benchmark,
+        "--variant",
+        unit.variant,
+    )
+    _run_subprocess(json_args)
+
+
 def _cleanup_smt_processes() -> None:
     if shutil.which("pkill") is None:
         return
@@ -1220,6 +1234,7 @@ def target(
         sample_ids=parsed_sample_ids,
     )
     execute_units([unit], force=True)
+    _export_target_sample_json(unit)
 
 
 if __name__ == "__main__":
