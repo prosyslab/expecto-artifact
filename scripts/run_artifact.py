@@ -15,6 +15,7 @@ PYTHON_BIN = sys.executable
 DEFAULT_OUTPUT_ROOT = Path("/workspace/data/experiment/artifact")
 STANDARD_PROFILE_NAME = "full"
 MINI_PROFILE_NAME = "mini"
+TARGET_PROFILE_NAME = "target"
 RQ_CHOICES = ("rq1", "rq2", "rq3", "rq4")
 EVALPLUS_BENCHMARKS = ("apps", "humaneval_plus")
 BENCHMARK_LABELS = {
@@ -1251,7 +1252,7 @@ def target(
     if limit is not None and parsed_sample_ids:
         raise click.UsageError("Use either --limit or --sample-ids, not both.")
 
-    layout = _layout(output_root, STANDARD_PROFILE_NAME)
+    layout = _layout(output_root, TARGET_PROFILE_NAME)
     _print_summary(layout)
     unit = build_target_unit(
         layout,
@@ -1261,7 +1262,7 @@ def target(
         limit=limit,
         sample_ids=parsed_sample_ids,
     )
-    execute_units([unit], force=force, dry_run=dry_run)
+    execute_units([unit], force=true, dry_run=dry_run)
 
 
 if __name__ == "__main__":

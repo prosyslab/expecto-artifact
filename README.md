@@ -113,20 +113,25 @@ Generated outputs from the artifact runner are written under:
 
 ```text
 /workspace/data/experiment/artifact
-├── full/
+├── full/                              <- Full paper reproduction outputs
+│   ├── runs/                          <- Raw experiment runs for each benchmark/variant
+│   │   ├── apps/                      <- APPS raw run directories
+│   │   ├── humaneval_plus/            <- HumanEval+ raw run directories
+│   │   └── defects4j/                 <- Defects4J raw run directories
+│   └── figures/                       <- Generated paper-facing tables and figures
+│       ├── configs/                   <- Auto-generated figure configuration JSON files
+│       ├── rq1/                       <- RQ1 outputs
+│       ├── rq2/                       <- RQ2 outputs
+│       ├── rq3/                       <- RQ3 outputs
+│       └── rq4/                       <- RQ4 outputs
+├── mini/                              <- Reduced fixed-sample profile outputs
 │   ├── runs/
-│   │   ├── apps/
-│   │   ├── humaneval_plus/
-│   │   └── defects4j/
 │   └── figures/
-│       ├── configs/
-│       ├── rq1/
-│       ├── rq2/
-│       ├── rq3/
-│       └── rq4/
-└── mini/
-    ├── runs/
-    └── figures/
+└── target/                            <- Targeted reproduction outputs
+    └── runs/
+        ├── apps/
+        ├── humaneval_plus/
+        └── defects4j/
 ```
 
 ---
@@ -335,12 +340,12 @@ What this command does:
 
 Where the results are stored:
 
-- `apps` and `humaneval_plus` targets: `/workspace/data/experiment/artifact/full/runs/<benchmark>/<variant>`
-- `defects4j` targets: `/workspace/data/experiment/artifact/full/runs/defects4j/<variant>`
+- `apps` and `humaneval_plus` targets: `/workspace/data/experiment/artifact/target/runs/<benchmark>/<variant>`
+- `defects4j` targets: `/workspace/data/experiment/artifact/target/runs/defects4j/<variant>`
 
 ---
 # 6. Reproducing only a specific `target_id`
-If you want to reproduce exactly one benchmark instance instead of the default sweep, use `run_artifact.py target` with `--sample-ids`.
+If you want to reproduce exactly one benchmark instance instead of the default sweep, use `run_artifact.py target` with `--sample-ids`. This mode only reruns the requested raw target and does not generate paper-facing figures or tables.
 
 General rules:
 
@@ -358,7 +363,7 @@ python3 scripts/run_artifact.py target \
 
 This example reproduces only APPS problem `3701` for the `rq2/topdown` target, and writes the result to:
 
-- `/workspace/data/experiment/artifact/full/runs/apps/topdown`
+- `/workspace/data/experiment/artifact/target/runs/apps/topdown`
 
 For `HumanEval+`, run:
 
