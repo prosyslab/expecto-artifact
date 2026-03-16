@@ -52,11 +52,8 @@ EOF
 
 **4. Before running the artifact, download the dataset bundle from Zenodo and extract it at the repository root.**
 
-Replace the placeholder URL below with the final Zenodo URL when it is available:
-
 ```bash
-wget -O datasets.tar.gz https://zenodo.org/records/00000000/files/datasets.tar.gz
-rm -rf datasets
+wget -O datasets.tar.gz https://zenodo.org/records/19042721/files/datasets.tar.gz
 tar -xzf datasets.tar.gz
 ```
 
