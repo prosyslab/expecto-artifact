@@ -292,11 +292,10 @@ python3 scripts/run_artifact.py rq1
 ### 5.1.2 What this does
 This command runs specification generation and evaluation for six experiment settings (2 benchmarks x 3 configs) and produces the main `RQ1` outputs: Table 1 and Fig. 8.
 Table 1 shows the number of samples in each classification category (`S&C`, `S`, `C`, and `W`) for each setting.
-Fig. 8 shows how the number of samples in the `S&C`, `S`, `C`, and `W` categories changes as the threshold `X` in the soundness criterion varies.
-Here, the soundness rule checks how many incorrect input-output pairs are rejected by the generated specification.
+Fig. 8 shows how the number of samples in the `S&C` and `W` categories changes as the threshold `X` in the soundness criterion varies.
 For example, suppose a benchmark has 10 incorrect input-output pairs, and a generated specification rejects 8 of them.
-Then the specification satisfies the soundness rule when `X = 80`, because it catches at least 80% of the incorrect pairs, but it does not satisfy the rule when `X = 90`.
-Fig. 8 repeats this counting process for different threshold values and shows how the classification totals change.
+Then the specification is sound when `X = 80`, because it catches at least 80% of the incorrect pairs, but it is not sound when `X = 90`.
+Fig. 8 repeats this counting for different threshold values and shows how the classification changes.
 The generated table and figure can be found at:
 - Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
 - Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`

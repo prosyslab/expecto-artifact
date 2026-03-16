@@ -1368,7 +1368,7 @@ def _extract_expecto_completion_payload(sample: Sample) -> Any:
     return completion
 
 
-def _extract_expecto_postcondition(sample: Sample) -> str:
+def _extract_expecto_specification(sample: Sample) -> str:
     payload = _extract_expecto_completion_payload(sample)
     if isinstance(payload, Mapping):
         generated_codes = payload.get("generated_codes")
@@ -1405,7 +1405,7 @@ def build_expecto_sample_rows(
                 ),
                 "classification": _category_label(category),
                 "nl_description": _extract_expecto_nl_description(sample, benchmark),
-                "postcondition": _extract_expecto_postcondition(sample),
+                "specification": _extract_expecto_specification(sample),
             }
         )
     return rows
@@ -1437,7 +1437,7 @@ def build_evalplus_nl2_sample_rows(
                     ),
                     "classification": category,
                     "nl_description": "",
-                    "postcondition": str(entry.get("assertion", "")),
+                    "specification": str(entry.get("assertion", "")),
                 }
             )
     return rows
@@ -1457,7 +1457,7 @@ def build_defects4j_nl2_sample_rows(
                 "id": _normalize_exported_sample_id(benchmark, entry.get("id", "")),
                 "classification": category,
                 "nl_description": "",
-                "postcondition": str(entry.get("assertion", "")),
+                "specification": str(entry.get("assertion", "")),
             }
         )
     return rows

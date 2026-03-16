@@ -216,7 +216,7 @@ def _check_sample_result_outputs(output_root: Path) -> bool:
             ok = False
             continue
 
-        required_fields = {"id", "classification", "nl_description", "postcondition"}
+        required_fields = {"id", "classification", "nl_description", "specification"}
         missing_fields: list[str] = []
         for index, entry in enumerate(payload):
             if not isinstance(entry, dict):
