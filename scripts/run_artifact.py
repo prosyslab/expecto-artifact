@@ -714,7 +714,7 @@ def build_target_unit(
     ]
     if not supported_families:
         raise click.ClickException(
-            f"Variant '{variant}' is not supported for benchmark '{benchmark}'"
+            f"Configuration '{variant}' is not supported for benchmark '{benchmark}'"
         )
 
     if family is None:
@@ -727,7 +727,7 @@ def build_target_unit(
         if family not in supported_families:
             valid_families = ", ".join(supported_families)
             raise click.ClickException(
-                f"Variant '{variant}' is not valid for family '{family}' "
+                f"Configuration '{variant}' is not valid for family '{family}' "
                 f"on benchmark '{benchmark}'. Valid family values: {valid_families}"
             )
 
@@ -1190,7 +1190,7 @@ def mini(
     required=True,
 )
 @click.option(
-    "--variant",
+    "--config",
     type=click.Choice(
         (
             "mono",
@@ -1202,6 +1202,7 @@ def mini(
         )
     ),
     required=True,
+    help="Artifact configuration to run for the selected benchmark.",
 )
 @click.option(
     "--output-root",
@@ -1223,7 +1224,7 @@ def mini(
 )
 def target(
     benchmark: str,
-    variant: str,
+    config: str,
     output_root: Path,
     limit: int | None,
     sample_ids: str | None,
@@ -1240,7 +1241,7 @@ def target(
         layout,
         benchmark=benchmark,
         family=None,
-        variant=variant,
+        variant=config,
         limit=limit,
         sample_ids=parsed_sample_ids,
     )
