@@ -29,6 +29,14 @@ RQ1_NL2_MARKER_DIRS = (
     Path("full/runs/humaneval_plus/nl2_base"),
     Path("full/runs/humaneval_plus/nl2_simple"),
 )
+RQ1_SAMPLE_RESULT_FILES = (
+    Path("full/runs/apps/ts/sample_results.json"),
+    Path("full/runs/apps/nl2_base/sample_results.json"),
+    Path("full/runs/apps/nl2_simple/sample_results.json"),
+    Path("full/runs/humaneval_plus/ts/sample_results.json"),
+    Path("full/runs/humaneval_plus/nl2_base/sample_results.json"),
+    Path("full/runs/humaneval_plus/nl2_simple/sample_results.json"),
+)
 
 
 def _print_status(ok: bool, label: str, detail: str | None = None) -> None:
@@ -177,6 +185,16 @@ def _check_figure_outputs(output_root: Path) -> bool:
     return ok
 
 
+def _check_sample_result_outputs(output_root: Path) -> bool:
+    ok = True
+    for relative_path in RQ1_SAMPLE_RESULT_FILES:
+        output_path = output_root / relative_path
+        exists = output_path.is_file()
+        _print_status(exists, "sample result output", str(output_path))
+        ok = ok and exists
+    return ok
+
+
 @click.command()
 @click.option(
     "--output-root",
@@ -281,6 +299,25 @@ def main(output_root: Path) -> None:
         if missing_figures:
             figure_issue = "Missing RQ1 output files: " + ", ".join(missing_figures)
         _record_check(checks, issues, "RQ1 figure outputs", figure_ok, figure_issue)
+
+        sample_results_ok = _check_sample_result_outputs(output_root)
+        missing_sample_results = [
+            str(output_root / relative_path)
+            for relative_path in RQ1_SAMPLE_RESULT_FILES
+            if not (output_root / relative_path).is_file()
+        ]
+        sample_results_issue = None
+        if missing_sample_results:
+            sample_results_issue = (
+                "Missing sample result files: " + ", ".join(missing_sample_results)
+            )
+        _record_check(
+            checks,
+            issues,
+            "sample result outputs",
+            sample_results_ok,
+            sample_results_issue,
+        )
 
     overall_ok = all(result for _, result in checks)
 

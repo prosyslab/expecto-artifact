@@ -777,7 +777,15 @@ def _run_subprocess(args: Sequence[str]) -> None:
     subprocess.run(args, cwd=PROJECT_ROOT, check=True)
 
 
-def _export_target_sample_json(unit: ExperimentUnit) -> None:
+def _sample_results_path(unit: ExperimentUnit) -> Path:
+    return unit.run_dir / "sample_results.json"
+
+
+def _export_sample_json(unit: ExperimentUnit, *, force: bool) -> None:
+    output_path = _sample_results_path(unit)
+    if output_path.exists() and not force:
+        return
+
     json_args = (
         PYTHON_BIN,
         _click_path(FIGURE_GENERATOR),
@@ -787,6 +795,8 @@ def _export_target_sample_json(unit: ExperimentUnit) -> None:
         unit.benchmark,
         "--variant",
         unit.variant,
+        "--output-path",
+        _click_path(output_path),
     )
     _run_subprocess(json_args)
 
@@ -812,17 +822,18 @@ def execute_units(
     for unit in units:
         if unit.is_complete() and not force:
             _echo_unit_status(unit, "skip")
-            continue
+        else:
+            if unit.run_dir.exists():
+                _remove_tree(unit.run_dir)
 
-        if unit.run_dir.exists():
-            _remove_tree(unit.run_dir)
+            _ensure_dir(unit.run_dir.parent)
+            _echo_unit_status(unit, "run")
+            _run_subprocess(unit.command)
 
-        _ensure_dir(unit.run_dir.parent)
-        _echo_unit_status(unit, "run")
-        _run_subprocess(unit.command)
+            if unit.cleanup_smt:
+                _cleanup_smt_processes()
 
-        if unit.cleanup_smt:
-            _cleanup_smt_processes()
+        _export_sample_json(unit, force=force)
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -1234,7 +1245,6 @@ def target(
         sample_ids=parsed_sample_ids,
     )
     execute_units([unit], force=True)
-    _export_target_sample_json(unit)
 
 
 if __name__ == "__main__":
