@@ -135,22 +135,22 @@ In the paper, we used three different benchmarks, four Expecto variant configura
 This section shows how to run any benchmark by specifying the problem ID for each of the 3 x (4 + 2) = 18 possible combinations.
 
 ## 3.1 Reproducing the paper's motivating example: APPS problem `75`
-To compare Expecto (`ts`) with the two NL2Postcond variants (`nl2_base` and `nl2_simple`) on the motivating example of the paper (APPS problem `75`), run the following three commands:
+To compare Expecto with the two NL2Postcond variants (`nl2_base` and `nl2_simple`) on the motivating example of the paper, run the following three commands:
 
 ```bash
 python3 scripts/run_artifact.py target \
   --benchmark apps \
-  --variant ts \
+  --variant ts \ # Expecto with tree search and test cases
   --sample-ids 75
 
 python3 scripts/run_artifact.py target \
   --benchmark apps \
-  --variant nl2_base \
+  --variant nl2_base \ # NL2Postcond base prompt strategy
   --sample-ids 75
 
 python3 scripts/run_artifact.py target \
   --benchmark apps \
-  --variant nl2_simple \
+  --variant nl2_simple \ # NL2Postcond simple prompt strategy
   --sample-ids 75
 ```
 
