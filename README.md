@@ -23,7 +23,7 @@ In the paper, the experiments were conducted with:
 
 ### Setup with Docker
 
-**1. Pull/Build the Docker image:**
+**1. Pull or Build the Docker image (You only have to do one of them):**
 
 Pull:
 ```bash
