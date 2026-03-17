@@ -275,6 +275,7 @@ It then processes the outputs into the same figure and table formats shown in th
 
 - The results for each benchmark / generation-configuration combination are stored at:
   - `/workspace/data/experiment/artifact/full/runs/<BENCHMARK>/<CONFIG>/sample_results.json`
+  - The raw LLM outputs and evaluation artifacts used to build each summary are stored alongside it under `/workspace/data/experiment/artifact/full/runs/<BENCHMARK>/<CONFIG>/`
 - The paper's figures and tables are stored at:
   - Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
   - Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
@@ -304,7 +305,14 @@ Fig. 8 shows how the number of samples in the `S&C` and `W` categories changes a
 For example, suppose a benchmark has 10 incorrect input-output pairs, and a generated specification rejects 8 of them.
 Then the specification is sound when `X = 80`, because it catches at least 80% of the incorrect pairs, but it is not sound when `X = 90`.
 Fig. 8 repeats this counting for different threshold values and shows how the classification changes.
-The generated table and figure can be found at:
+The generated raw data and final outputs can be found at:
+- Paths to `sample_results.json`:
+  - `/workspace/data/experiment/artifact/full/runs/apps/ts/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/apps/nl2_base/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/apps/nl2_simple/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/ts/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/nl2_base/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/nl2_simple/sample_results.json`
 - Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
 - Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
 
@@ -322,7 +330,14 @@ This command runs specification generation and evaluation for six Expecto ablati
 Fig. 9 is a bar chart comparing the number of samples in each classification category for different Expecto generation algorithms.
 It shows that introducing top-down synthesis and tree search improves the quality of the generated specifications, for example by increasing the number of `S&C` specifications and decreasing the number of `W` specifications.
 This can be seen from the fact that, for each benchmark, the number of `S&C` specifications increases in the order `mono < topdown < ts`.
-The generated figure can be found at:
+The generated raw data and final output can be found at:
+- Paths to `sample_results.json`:
+  - `/workspace/data/experiment/artifact/full/runs/apps/mono/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/apps/topdown/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/apps/ts/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/mono/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/topdown/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/ts/sample_results.json`
 - Fig. 9 (RQ2 generation algorithm ablation): `/workspace/data/experiment/artifact/full/figures/rq2/evaluation.rq2.pdf`
 
 ## 5.3 RQ3: Impact of test cases on specification generation
@@ -338,7 +353,12 @@ python3 scripts/run_artifact.py rq3
 This command runs specification generation and evaluation for four experiment settings (2 benchmarks x 2 configs) and produces the main `RQ3` output, Fig. 10.
 Fig. 10 is a bar chart comparing the number of samples in each classification category (`S&C`, `S`, `C`, `W`) between the `ts` configuration, which uses test cases, and the `without_tc` configuration, which does not.
 It shows that introducing test cases improves the quality of the generated specifications, for example by increasing the number of `S&C` specifications.
-The generated figure can be found at:
+The generated raw data and final output can be found at:
+- Paths to `sample_results.json`:
+  - `/workspace/data/experiment/artifact/full/runs/apps/ts/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/apps/without_tc/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/ts/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/humaneval_plus/without_tc/sample_results.json`
 - Fig. 10 (RQ3 test-case ablation): `/workspace/data/experiment/artifact/full/figures/rq3/evaluation.rq3.testcase.pdf`
 
 ## 5.4 RQ4: Effectiveness of Expecto for bug detection in real-world software
@@ -355,7 +375,11 @@ This command runs specification generation and evaluation for three `Defects4J` 
 Table 2 compares the number of specifications in each classification category (`S&C`, `S`, `C`, `W`) produced on the `Defects4J` benchmark by Expecto (`ts`) and the two NL2Postcond prompt strategies (`nl2_base`, `nl2_simple`).
 The table shows that Expecto produces more specifications that are both correct and capable of detecting bugs (`S&C`) than NL2Postcond,
 while also producing fewer `W` specifications.
-The generated table can be found at:
+The generated raw data and final output can be found at:
+- Paths to `sample_results.json`:
+  - `/workspace/data/experiment/artifact/full/runs/defects4j/ts/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/defects4j/nl2_base/sample_results.json`
+  - `/workspace/data/experiment/artifact/full/runs/defects4j/nl2_simple/sample_results.json`
 - Table 2 (RQ4 Defects4J comparison): `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
 
 # 6. Running reduced benchmarks for quick inspection
@@ -398,3 +422,126 @@ The fixed sample IDs used by `mini` are listed below. You do not need these IDs 
 ```text
 Chart_6_workspace_objdump_d4j_full_fresh_chart_6_source_org_jfree_chart_util_ShapeList_java_boolean_equals_Object_obj, Cli_18_workspace_objdump_d4j_full_fresh_cli_18_src_java_org_apache_commons_cli_PosixParser_java_void_processOptionToken_String_token_boolean_stopAtNonOption, Compress_40_workspace_objdump_d4j_full_compress_40_src_main_java_org_apache_commons_compress_utils_BitInputStream_java_long_readBits_int_count, Jsoup_76_workspace_objdump_d4j_full_jsoup_76_src_main_java_org_jsoup_parser_HtmlTreeBuilderState_java_boolean_process_Token_t_HtmlTreeBuilder_tb, Jsoup_85_workspace_objdump_d4j_full_jsoup_85_src_main_java_org_jsoup_nodes_Attribute_java_Attribute_String_key_String_val_Attributes_parent, Lang_32_workspace_objdump_d4j_full_lang_32_src_main_java_org_apache_commons_lang3_builder_HashCodeBuilder_java_boolean_isRegistered_Object_value, Math_35_workspace_objdump_d4j_full_math_35_src_main_java_org_apache_commons_math3_genetics_ElitisticListPopulation_java_ElitisticListPopulation_int_populationLimit_double_elitismRate, Math_73_workspace_objdump_d4j_full_math_73_src_main_java_org_apache_commons_math_analysis_solvers_BrentSolver_java_double_solve_UnivariateRealFunction_f_double_min_double_max, Math_80_workspace_objdump_d4j_full_math_80_src_main_java_org_apache_commons_math_linear_EigenDecompositionImpl_java_boolean_flipIfWarranted_int_n_int_step, Math_96_workspace_objdump_d4j_full_math_96_src_java_org_apache_commons_math_complex_Complex_java_boolean_equals_Object_other, Cli_10_workspace_objdump_d4j_full_fresh_cli_10_src_java_org_apache_commons_cli_Parser_java_CommandLine_parse_Options_options_String_arguments_Properties_properties_boolean_stopAtNonOption, Cli_18_workspace_objdump_d4j_full_fresh_cli_18_src_java_org_apache_commons_cli_PosixParser_java_String_flatten_Options_options_String_arguments_boolean_stopAtNonOption, Cli_32_workspace_objdump_d4j_full_fresh_cli_32_src_main_java_org_apache_commons_cli_HelpFormatter_java_int_findWrapPos_String_text_int_width_int_startPos, Closure_114_workspace_objdump_d4j_full_fresh_closure_114_src_com_google_javascript_jscomp_NameAnalyzer_java_void_visit_NodeTraversal_t_Node_n_Node_parent, Closure_74_workspace_objdump_d4j_full_fresh_closure_74_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldBinaryOperator_Node_subtree, Closure_78_workspace_objdump_d4j_full_fresh_closure_78_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldArithmeticOp_Node_n_Node_left_Node_right, Closure_97_workspace_objdump_d4j_full_fresh_closure_97_src_com_google_javascript_jscomp_PeepholeFoldConstants_java_Node_tryFoldBinaryOperator_Node_subtree, Codec_4_workspace_objdump_d4j_full_codec_4_src_java_org_apache_commons_codec_binary_Base64_java_byte_encodeBase64_byte_binaryData_boolean_isChunked_boolean_urlSafe_int_maxResultSize, Jsoup_38_workspace_objdump_d4j_full_jsoup_38_src_main_java_org_jsoup_parser_HtmlTreeBuilderState_java_boolean_process_Token_t_HtmlTreeBuilder_tb, Jsoup_46_workspace_objdump_d4j_full_jsoup_46_src_main_java_org_jsoup_nodes_Entities_java_void_escape_StringBuilder_accum_String_string_Document_OutputSettings_out_boolean_inAttribute_boolean_normaliseWhite_boolean_stripLeadingWhite
 ```
+
+# 7. Adding a new benchmark
+
+This section explains the easiest way to add a new benchmark whose samples are structured like those in APPS or HumanEval+. Each item contains a natural-language problem description, correct input-output examples, incorrect input-output examples, and a function signature for the specification.
+
+## 7.1 Start from one complete example
+
+Below is a minimal example of a new benchmark item named `my_benchmark`.
+
+```json
+{
+  "problem_id": "1",
+  "prompt": "Write a function that returns True when a list of integers is sorted in non-decreasing order, and False otherwise.",
+  "input_output": "{\"inputs\": [[[1, 2, 2, 5]], [[3, 1, 4]], [[7]], [[0, 0, 0]], [[5, 4]]], \"outputs\": [true, false, true, true, false]}",
+  "mutated_input_output": "{\"inputs\": [[[1, 2, 2, 5]], [[3, 1, 4]], [[7]], [[0, 0, 0]], [[5, 4]]], \"outputs\": [false, true, false, false, true]}",
+  "signature": "def postcondition(nums: list[int], result: bool):\n    pass"
+}
+```
+
+This example works as follows:
+
+- `problem_id = "1"` becomes the sample identifier. The loader also uses it when filtering samples and selecting validation test cases.
+- `prompt` is the natural-language task description shown to the model.
+- `input_output` stores correct input-output pairs. It is used to check completeness, so the generated specification should accept these examples.
+- `mutated_input_output` stores incorrect input-output pairs. It is used to check soundness, so the generated specification should reject them.
+- `signature` says that the specification is a `postcondition` function over `nums: list[int]` and `result: bool` in Python grammar. **Every parameter in this signature must have an explicit type annotation.**
+
+## 7.2 General rules for every item
+
+If your new benchmark follows the same structure, each item should contain the following fields.
+
+| Field | Required? | Where it is used |
+| --- | --- | --- |
+| `problem_id` | Yes | Becomes `Sample.id` and `metadata["problem_id"]`. It is also used as the stable key for sample filtering and validation-test sampling in `record_to_sample(...)`. |
+| `prompt` | Yes | Becomes the natural-language problem description seen by the solver. In APPS, the loader combines it with a few example test cases; in HumanEval+, the loader uses it directly as `Sample.input`. |
+| `input_output` | Yes | A string representation of an object that contains `inputs` and `outputs` for correct input-output pairs. `record_to_sample(...)` calls `json.loads(...)` on this string, pairs each input with the corresponding output, and stores the result in `metadata["test_list"]`. This list is used for completeness evaluation. A small subset also becomes `metadata["prompt_test_list"]` to guide generation. |
+| `mutated_input_output` | Yes | A string representation of an object that contains `inputs` and `outputs` for incorrect or bug-revealing input-output pairs. `record_to_sample(...)` calls `json.loads(...)` on this string, pairs each input with the corresponding output, and stores the result in `metadata["mutated_test_list"]`. This list is used for soundness evaluation. |
+| `signature` | Yes | Copied to `metadata["signature"]`. Every parameter must have an explicit type annotation. Write this signature using Python type syntax such as `list[int]`, `bool`, and `tuple[int, str]`. The existing internal converters then transform those Python type annotations into the specification type system used by Expecto, so you should reuse that path instead of writing Expecto-specific types directly in the dataset. |
+| `parser` | No | Copied to `metadata["parser"]`. This field is only needed when the stored input and output examples must be converted before they match the `signature`. APPS needs it because its examples are stored as standard input and standard output strings. HumanEval+ does not need it because its examples are already stored as structured values, so it uses `null`. |
+
+If your benchmark needs extra metadata, you can add fields beyond those listed above. The fields listed here are the ones that must be handled by the current APPS- and HumanEval+-style loaders. Any other fields may be added freely for benchmark-specific use.
+
+## 7.3 Expected shape of the example fields
+
+The `input_output` and `mutated_input_output` fields are stored as strings. Each string must contain a JSON object with two arrays named `inputs` and `outputs`.
+
+All benchmarks in this format share the same first loading step:
+
+1. Read the string in `input_output` or `mutated_input_output`.
+2. Call `json.loads(...)` on that string.
+3. Read the `inputs` array and the `outputs` array from the decoded object.
+4. Pair them with `zip(inputs, outputs)`.
+5. Store the resulting list of `(input, output)` pairs in sample metadata.
+
+So, regardless of the benchmark, these fields must decode into an object with the exact keys `inputs` and `outputs`.
+
+### Case 1. HumanEval+ style: `json.loads(...)` is enough
+
+If your benchmark already stores structured values, `json.loads(...)` is enough, and you usually do not need a `parser`. HumanEval+ uses this style. After loading, the data can look like this:
+
+```json
+{
+  "inputs": [[[1, 2, 3], 2], [[5, 5], 1]],
+  "outputs": [true, false]
+}
+```
+
+In this case, each decoded input value already matches the structure expected by the `signature`. For example, if the signature is `def postcondition(nums: list[int], result: bool):`, an input may already be a list such as `[1, 2, 3]`, and an output may already be `true` or `false`. When these values come from `input_output`, they are treated as correct input-output pairs and used for completeness evaluation. When they come from `mutated_input_output`, they are treated as incorrect input-output pairs and used for soundness evaluation.
+
+### Case 2. APPS style: `json.loads(...)` plus `parser`
+
+If your benchmark stores raw standard input and standard output text, `json.loads(...)` is only the first step. APPS uses this style. After loading, the data may look like this:
+
+```json
+{
+  "inputs": ["1 2 3\n", "5 4\n"],
+  "outputs": ["True\n", "False\n"]
+}
+```
+
+In this case, the decoded values are still just strings. They do not yet match the structure expected by the `signature`. You therefore need a `parser` field that converts an input string and an output string into the argument tuple required by `postcondition(...)`.
+
+For example, if the signature is `def postcondition(nums: list[int], result: bool):`, the parser may need to:
+
+1. Split the input string.
+2. Convert the tokens to integers.
+3. Convert the output string to a Boolean value.
+4. Return `(nums, result)`.
+
+The loader still stores `(input, output)` pairs in metadata, but later generation and evaluation steps call the parser to convert those raw strings into meaningful values. Pairs from `input_output` are used to check completeness, and pairs from `mutated_input_output` are used to check soundness.
+
+In both cases, the loader pairs `inputs[i]` with `outputs[i]`, so both arrays must have the same length.
+
+For `signature`, prefer ordinary Python type annotations. For example:
+
+```python
+def postcondition(xs: list[int], target: int, result: bool):
+    pass
+```
+
+This project already contains converters that read these Python type annotations and turn them into the internal specification types used during template generation and evaluation. You should reuse that conversion path rather than inventing a separate type notation for the dataset. The relevant conversion logic is in `/workspace/expecto-artifact/expecto/src/utils/code.py` and `/workspace/expecto-artifact/expecto/src/utils/dsl.py`.
+
+## 7.4 How the fields move through the system
+
+The key implementation points are `record_to_sample(...)` in `/workspace/expecto-artifact/expecto/src/tasks/apps.py` and `/workspace/expecto-artifact/expecto/src/tasks/humaneval_plus.py`.
+
+- `prompt` becomes `Sample.input`, which is the natural-language description the solver receives.
+- `input_output` is parsed into correct `(input, output)` pairs and stored in `metadata["test_list"]`; the completeness scorer reads this list in `/workspace/expecto-artifact/expecto/src/evaluation/scorer.py`.
+- `mutated_input_output` is parsed into incorrect `(input, output)` pairs and stored in `metadata["mutated_test_list"]`; the soundness scorer reads this list in `/workspace/expecto-artifact/expecto/src/evaluation/scorer.py`.
+- A small subset of correct examples becomes `metadata["prompt_test_list"]`; the non-agentic solver and tree-search solver use these examples during generation in `/workspace/expecto-artifact/expecto/src/solvers/non_agentic.py` and `/workspace/expecto-artifact/expecto/src/solvers/tree_search.py`.
+- `signature` becomes `metadata["signature"]`; it is used to build the initial specification template and to type the generated checking code.
+- `parser` becomes `metadata["parser"]`; if it is present, it is passed to generation-time consistency checks and evaluation-time scoring code so that stored examples can be converted into the argument tuple required by `postcondition(...)`.
+
+## 7.5 Practical steps to add the benchmark
+
+The simplest workflow is:
+
+1. Add a new dataset file such as `datasets/my_benchmark.json`.
+2. Create a new task file by copying `/workspace/expecto-artifact/expecto/src/tasks/apps.py` or `/workspace/expecto-artifact/expecto/src/tasks/humaneval_plus.py`.
+3. Update the task name, dataset file name, and `benchmark=` argument passed to `sample_sequence_for_validation(...)`.
+4. Keep the `record_to_sample(...)` contract compatible with the existing solvers and scorers.
+
+If your new benchmark can be expressed with this schema, you usually do not need to change the solver or scorer code. In practice, adding the dataset file and a new task module modeled after `/workspace/expecto-artifact/expecto/src/tasks/apps.py` or `/workspace/expecto-artifact/expecto/src/tasks/humaneval_plus.py` is usually enough.

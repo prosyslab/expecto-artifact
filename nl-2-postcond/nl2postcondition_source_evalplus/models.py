@@ -10,10 +10,8 @@ class EvaluationResult(BaseModel):
     sound_ratio: float
     true_cnt_correct: int
     false_cnt_correct: int
-    error_cnt_correct: int
     true_cnt_mutated: int
     false_cnt_mutated: int
-    error_cnt_mutated: int
     msg_completeness: str
     msg_soundness: str
 

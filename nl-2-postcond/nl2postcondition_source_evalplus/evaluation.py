@@ -84,15 +84,14 @@ import re
 
 true_cnt = 0
 false_cnt = 0
-error_cnt = 0
 """
     io_pairs = json.loads(args)
     for i, o in zip(io_pairs["inputs"], io_pairs["outputs"]):
         eval_code += "try:\n"
         eval_code += f"    v = postcondition(*parser({repr(i)}, {repr(o)}))\n"
         eval_code += "    if v == True:\n        true_cnt += 1\n    else:\n        false_cnt += 1\n"
-        eval_code += "except Exception as e:\n    error_cnt += 1\n"
-    eval_code += "print(f'{true_cnt} {false_cnt} {error_cnt}', flush=True)\n"
+        eval_code += "except Exception:\n    false_cnt += 1\n"
+    eval_code += "print(f'{true_cnt} {false_cnt}', flush=True)\n"
     return eval_code
 
 
@@ -108,15 +107,14 @@ import re
 
 true_cnt = 0
 false_cnt = 0
-error_cnt = 0
 """
     for i, o in zip(io_pairs_dict["inputs"], io_pairs_dict["outputs"]):
         input_args_str = ", ".join(repr(arg) for arg in i)
         eval_code += "try:\n"
         eval_code += f"    v = postcondition({input_args_str}, {repr(o)})\n"
         eval_code += "    if v == True:\n        true_cnt += 1\n    else:\n        false_cnt += 1\n"
-        eval_code += "except Exception as e:\n    raise e\n"
-    eval_code += "print(f'{true_cnt} {false_cnt} {error_cnt}', flush=True)\n"
+        eval_code += "except Exception:\n    false_cnt += 1\n"
+    eval_code += "print(f'{true_cnt} {false_cnt}', flush=True)\n"
     return eval_code
 
 
@@ -143,7 +141,7 @@ def normalize_output(content: bytes | str | None) -> str:
 
 def run_code_sync(
     code: str, num_of_tc: int, stdout_log_path: str, stderr_log_path: str
-) -> tuple[int, int, int, str]:
+) -> tuple[int, int, str]:
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py") as tmp:
         tmp.write(code)
         tmp.flush()
@@ -161,7 +159,7 @@ def run_code_sync(
         except subprocess.TimeoutExpired as exc:
             write_log(stdout_log_path, normalize_output(exc.stdout))
             write_log(stderr_log_path, normalize_output(exc.stderr) + "Timeout\n")
-            return 0, 0, num_of_tc, f"Timeout. See logs: {stdout_log_path}, {stderr_log_path}"
+            return 0, num_of_tc, f"Timeout. See logs: {stdout_log_path}, {stderr_log_path}"
 
         write_log(stdout_log_path, completed.stdout)
         if completed.stderr:
@@ -172,7 +170,6 @@ def run_code_sync(
         if completed.returncode != 0:
             return (
                 0,
-                0,
                 num_of_tc,
                 "Process exited with code "
                 f"{completed.returncode}. See logs: {stdout_log_path}, {stderr_log_path}",
@@ -180,18 +177,17 @@ def run_code_sync(
 
         stdout_str = completed.stdout.strip()
         if not stdout_str:
-            return 0, 0, num_of_tc, f"No stdout. See logs: {stdout_log_path}, {stderr_log_path}"
+            return 0, num_of_tc, f"No stdout. See logs: {stdout_log_path}, {stderr_log_path}"
 
         processed = stdout_str.split()
-        if len(processed) != 3:
+        if len(processed) != 2:
             return (
-                0,
                 0,
                 num_of_tc,
                 f"Invalid stdout format: {stdout_str}. See logs: {stdout_log_path}, {stderr_log_path}",
             )
 
-        return int(processed[0]), int(processed[1]), int(processed[2]), "Success"
+        return int(processed[0]), int(processed[1]), "Success"
     finally:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp_path)
@@ -199,7 +195,7 @@ def run_code_sync(
 
 async def run_code(
     code: str, num_of_tc: int, stdout_log_path: str, stderr_log_path: str
-) -> tuple[int, int, int, str]:
+) -> tuple[int, int, str]:
     return await asyncio.to_thread(
         run_code_sync, code, num_of_tc, stdout_log_path, stderr_log_path
     )
@@ -292,7 +288,6 @@ async def evaluate_one_assertion(
     (
         true_cnt_correct,
         false_cnt_correct,
-        error_cnt_correct,
         msg_completeness,
     ) = await run_code(
         eval_code,
@@ -320,7 +315,6 @@ async def evaluate_one_assertion(
     (
         true_cnt_mutated,
         false_cnt_mutated,
-        error_cnt_mutated,
         msg_soundness,
     ) = await run_code(
         eval_code,
@@ -332,18 +326,14 @@ async def evaluate_one_assertion(
     return EvaluationResult(
         task_id=data["task_id"],
         assertion=assertion,
-        is_complete=(
-            false_cnt_correct == 0 and true_cnt_correct > 0 and error_cnt_correct == 0
-        ),
+        is_complete=(false_cnt_correct == 0 and true_cnt_correct > 0),
         is_sound=false_cnt_mutated > true_cnt_mutated,
         complete_ratio=true_cnt_correct / complete_total,
         sound_ratio=false_cnt_mutated / sound_total,
         true_cnt_correct=true_cnt_correct,
         false_cnt_correct=false_cnt_correct,
-        error_cnt_correct=error_cnt_correct,
         true_cnt_mutated=true_cnt_mutated,
         false_cnt_mutated=false_cnt_mutated,
-        error_cnt_mutated=error_cnt_mutated,
         msg_completeness=msg_completeness,
         msg_soundness=msg_soundness,
     )

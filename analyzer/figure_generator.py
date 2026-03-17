@@ -50,6 +50,7 @@ sys.path.append(str(project_root))
 
 from utils import read_score_logs
 
+from expecto.src.DSL.compiler import DSLCompiler
 from expecto.src.evaluation.models import (
     EvaluationResult,
     Sample,
@@ -643,19 +644,22 @@ def _compute_nl2_threshold_counts(
     for row in rows:
         true_mutated = _get_numeric(row, "true_cnt_mutated")
         false_mutated = _get_numeric(row, "false_cnt_mutated")
-        error_mutated = _get_numeric(row, "error_cnt_mutated")
         true_correct = _get_numeric(row, "true_cnt_correct")
         false_correct = _get_numeric(row, "false_cnt_correct")
-        error_correct = _get_numeric(row, "error_cnt_correct")
+        # Older NL2Postcond outputs tracked exceptions separately. Newer outputs
+        # fold per-test exceptions into false counts. Treat both formats
+        # consistently by absorbing legacy error counters into false totals.
+        false_mutated += _get_numeric(row, "error_cnt_mutated")
+        false_correct += _get_numeric(row, "error_cnt_correct")
 
         for tau in thresholds:
-            total_mutated = true_mutated + false_mutated + error_mutated
+            total_mutated = true_mutated + false_mutated
             is_sound = (
                 total_mutated > 0
                 and false_mutated >= tau * total_mutated
                 and false_mutated > 0
             )
-            is_complete = true_correct > 0 and false_correct == 0 and error_correct == 0
+            is_complete = true_correct > 0 and false_correct == 0
 
             if is_sound and is_complete:
                 counts[tau]["sound_and_complete"] += 1
@@ -1368,6 +1372,36 @@ def _extract_expecto_completion_payload(sample: Sample) -> Any:
     return completion
 
 
+def _normalize_sample_result_text(text: str) -> str:
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not normalized:
+        return ""
+
+    return "\n".join(line.rstrip() for line in normalized.splitlines())
+
+
+def _compact_for_format_compare(text: str) -> str:
+    return re.sub(r"\s+", "", text)
+
+
+def _format_sample_specification(specification: str, *, is_expecto: bool) -> str:
+    normalized = _normalize_sample_result_text(specification)
+    if not normalized or not is_expecto:
+        return normalized
+
+    try:
+        compiler = DSLCompiler()
+        ast = compiler.parse(normalized)
+        round_tripped = compiler.unparse(ast, pretty_print=False).strip()
+        if len(_compact_for_format_compare(round_tripped)) < len(
+            _compact_for_format_compare(normalized)
+        ):
+            return normalized
+        return compiler.unparse(ast, pretty_print=True).strip()
+    except Exception:
+        return normalized
+
+
 def _extract_expecto_specification(sample: Sample) -> str:
     payload = _extract_expecto_completion_payload(sample)
     if isinstance(payload, Mapping):
@@ -1377,9 +1411,12 @@ def _extract_expecto_specification(sample: Sample) -> str:
         ):
             codes = [str(code).strip() for code in generated_codes if str(code).strip()]
             if codes:
-                return "\n\n".join(codes)
+                return _format_sample_specification(
+                    "\n\n".join(codes),
+                    is_expecto=True,
+                )
     if isinstance(payload, str):
-        return payload
+        return _format_sample_specification(payload, is_expecto=True)
     return ""
 
 
@@ -1437,7 +1474,10 @@ def build_evalplus_nl2_sample_rows(
                     ),
                     "classification": category,
                     "nl_description": "",
-                    "specification": str(entry.get("assertion", "")),
+                    "specification": _format_sample_specification(
+                        str(entry.get("assertion", "")),
+                        is_expecto=False,
+                    ),
                 }
             )
     return rows
@@ -1457,7 +1497,10 @@ def build_defects4j_nl2_sample_rows(
                 "id": _normalize_exported_sample_id(benchmark, entry.get("id", "")),
                 "classification": category,
                 "nl_description": "",
-                "specification": str(entry.get("assertion", "")),
+                "specification": _format_sample_specification(
+                    str(entry.get("assertion", "")),
+                    is_expecto=False,
+                ),
             }
         )
     return rows
