@@ -149,7 +149,7 @@ Run the following commands to compare Expecto's tree-search configuration (`ts`)
 **It takes about 2 minutes.**
 
 ```bash
-# run Expecto (`ts`: tree-search specification synthesis with test-case-based validation)
+# run Expecto (`ts` means the tree search specification synthesis + specification validation with test cases)
 python3 scripts/run_artifact.py target \
   --benchmark apps \
   --config ts \
