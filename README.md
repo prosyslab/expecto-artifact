@@ -538,13 +538,13 @@ This project already contains converters that read these Python type annotations
 
 The relevant conversion logic is in `/workspace/expecto-artifact/expecto/src/utils/dsl.py`.
 
-## 7.5 Practical steps to add the benchmark
-
-The simplest workflow is:
+## 7.5 Steps to add the benchmark
 
 1. Add a new dataset file such as `datasets/my_benchmark.json`.
 2. Create a new task file by copying `/workspace/expecto-artifact/expecto/src/tasks/apps.py` or `/workspace/expecto-artifact/expecto/src/tasks/humaneval_plus.py`.
 3. Update the task name, dataset file name, and `benchmark=` argument passed to `sample_sequence_for_validation(...)`.
 4. Keep the `record_to_sample(...)` contract compatible with the existing solvers and scorers.
 
-If your new benchmark can be expressed with this schema, you usually do not need to change the solver or scorer code. In practice, adding the dataset file and a new task module modeled after `/workspace/expecto-artifact/expecto/src/tasks/apps.py` or `/workspace/expecto-artifact/expecto/src/tasks/humaneval_plus.py` is usually enough.
+If your new benchmark can be expressed with this schema, you usually do not need to change the solver or scorer code.
+In practice, adding the dataset file and a new task module modeled after
+`/workspace/expecto-artifact/expecto/src/tasks/apps.py` or `/workspace/expecto-artifact/expecto/src/tasks/humaneval_plus.py` is usually enough.
