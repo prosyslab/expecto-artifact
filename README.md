@@ -425,7 +425,7 @@ Chart_6_workspace_objdump_d4j_full_fresh_chart_6_source_org_jfree_chart_util_Sha
 
 # 7. Adding a new benchmark
 
-This section explains the easiest way to add a new benchmark whose samples are structured like those in APPS or HumanEval+. Each item contains a natural-language problem description, correct input-output examples, incorrect input-output examples, and a function signature for the specification.
+This section explains the easiest way to add a new benchmark like APPS and HumanEval+.
 
 ## 7.1 Start from one complete example
 
@@ -522,18 +522,21 @@ def postcondition(xs: list[int], target: int, result: bool):
     pass
 ```
 
-This project already contains converters that read these Python type annotations and turn them into the internal specification types used during template generation and evaluation. You should reuse that conversion path rather than inventing a separate type notation for the dataset. The relevant conversion logic is in `/workspace/expecto-artifact/expecto/src/utils/code.py` and `/workspace/expecto-artifact/expecto/src/utils/dsl.py`.
+This project already contains converters that read these Python type annotations and turn them into the internal specification types used during template generation and evaluation. You should reuse that conversion path rather than inventing a separate type notation for the dataset.
 
-## 7.4 How the fields move through the system
+| Python annotation | Internal specification type |
+| --- | --- |
+| `int` | `int` |
+| `bool` | `bool` |
+| `float` | `real` |
+| `str` | `string` |
+| `list[T]` | `list[T]` |
+| `set[T]` | `set[T]` |
+| `tuple[T1, T2, ...]` | `tuple[T1, T2, ...]` |
+| `dict[K, V]` | `map[K, V]` |
+| `Optional[T]` | `option[T]` |
 
-The key implementation points are `record_to_sample(...)` in `/workspace/expecto-artifact/expecto/src/tasks/apps.py` and `/workspace/expecto-artifact/expecto/src/tasks/humaneval_plus.py`.
-
-- `prompt` becomes `Sample.input`, which is the natural-language description the solver receives.
-- `input_output` is parsed into correct `(input, output)` pairs and stored in `metadata["test_list"]`; the completeness scorer reads this list in `/workspace/expecto-artifact/expecto/src/evaluation/scorer.py`.
-- `mutated_input_output` is parsed into incorrect `(input, output)` pairs and stored in `metadata["mutated_test_list"]`; the soundness scorer reads this list in `/workspace/expecto-artifact/expecto/src/evaluation/scorer.py`.
-- A small subset of correct examples becomes `metadata["prompt_test_list"]`; the non-agentic solver and tree-search solver use these examples during generation in `/workspace/expecto-artifact/expecto/src/solvers/non_agentic.py` and `/workspace/expecto-artifact/expecto/src/solvers/tree_search.py`.
-- `signature` becomes `metadata["signature"]`; it is used to build the initial specification template and to type the generated checking code.
-- `parser` becomes `metadata["parser"]`; if it is present, it is passed to generation-time consistency checks and evaluation-time scoring code so that stored examples can be converted into the argument tuple required by `postcondition(...)`.
+The relevant conversion logic is in `/workspace/expecto-artifact/expecto/src/utils/dsl.py`.
 
 ## 7.5 Practical steps to add the benchmark
 
