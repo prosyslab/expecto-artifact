@@ -101,6 +101,9 @@ This test script checks the following:
 
 *Note: the figures generated here are not intended to reproduce the exact values reported in the paper. They only verify that the workflow runs correctly before you begin the full reproduction.*
 
+## 1.3 Notion before you start
+- LLM non-determinism: The generated specifications and their classifications may differ from the paper because of LLM non-determinism. However, the overall tendencies (e.g., Expecto producing more `S&C` specifications than NL2Postcond) should still hold.
+
 # 2. Directory structure
 The `expecto-artifact` repository has the following directory structure:
 
@@ -208,8 +211,6 @@ Each `sample_results.json` entry contains:
 - `classification`: the evaluation result for the generated specification. Here, Expecto produces sound and complete (`S&C`). In contrast, the two NL2Postcond configurations produce sound and incomplete (`S`) or complete and unsound (`C`) specifications, respectively.
 - `nl_description`: the original natural-language description from the APPS benchmark prompt.
 - `specification`: the generated formal specification itself. Figure2에 등장하는 specification들은 이 필드에 저장되어 있습니다. Expecto emits a DSL specification like `predicate spec(...)`. NL2Postcond emits a single assertion like `assert ...`.
-
-*Note: The fields and overall tendency should match, but the exact specification text and classification may differ because of LLM non-determinism.*
 
 ## 3.2 How to run other target problems
 ```bash
