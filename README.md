@@ -48,6 +48,8 @@ Expecto uses GPT-4.1-mini (OpenAI) as its LLM backend, so you need a valid
 OpenAI API key to run the experiments.
 Inside the container, change to `/workspace/expecto-artifact` and create a `.env` file with your OpenAI API key.
 
+*Note: OpenAI API key will be provided through hotcrp.*
+
 ```bash
 cd /workspace/expecto-artifact
 cat > .env <<'EOF'
@@ -103,6 +105,7 @@ This test script checks the following:
 
 ## 1.3 Notion before you start
 - LLM non-determinism: The generated specifications and their classifications may differ from the paper because of LLM non-determinism. However, the overall tendencies (e.g., Expecto producing more `S&C` specifications than NL2Postcond) should still hold.
+- DSL Compiler bug fix: After the submission version, we found some bugs in the DSL compiler that caused some specifications to be misclassified as `W` or `S` instead of `S&C`. We have fixed these bugs, so you may see more `S&C` specifications than the paper, especially for Expecto on each HumanEval+ and Defects4J. However, the overall trends and conclusions should still hold.
 
 # 2. Directory structure
 The `expecto-artifact` repository has the following directory structure:
