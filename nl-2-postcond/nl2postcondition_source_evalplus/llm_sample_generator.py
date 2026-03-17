@@ -16,6 +16,7 @@ from evalplus.data import write_jsonl
 from log import make_header
 from openai import OpenAI
 from omegaconf import OmegaConf
+from parallelism import get_scaled_worker_count
 from tenacity import Retrying, stop_after_attempt, wait_random_exponential
 
 CLIENT = None
@@ -25,8 +26,7 @@ MAX_GENERATION_WORKERS = 8
 
 
 def get_worker_count() -> int:
-    cpu_count = os.cpu_count() or 1
-    return max(1, min(MAX_GENERATION_WORKERS, int(cpu_count * 0.8)))
+    return get_scaled_worker_count(scale=0.8, maximum=MAX_GENERATION_WORKERS)
 
 
 def get_positive_int(cfg, key: str, default: int) -> int:

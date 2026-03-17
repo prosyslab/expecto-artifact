@@ -267,10 +267,6 @@ def get_latest_run_dir(parent_dir: Path) -> Path:
     return run_dirs[-1]
 
 
-def get_default_worker_count() -> int:
-    return max(1, int((os.cpu_count() or 2) * 0.75))
-
-
 def run_benchmark_experiment(
     benchmark: dict[str, object],
     output_root: Path,
@@ -286,7 +282,6 @@ def run_benchmark_experiment(
 ) -> None:
     output_root.mkdir(parents=True, exist_ok=True)
     python_bin = sys.executable
-    worker_count = workers if workers is not None else get_default_worker_count()
     benchmark_overrides = get_benchmark_overrides(
         benchmark, limit=limit, sample_ids=sample_ids
     )
@@ -329,13 +324,13 @@ def run_benchmark_experiment(
             str(benchmark["dataset"]),
             "--exp_name",
             experiment["name"],
-            "--workers",
-            str(worker_count),
             "--validation-sampling-mode",
             validation_sampling_mode,
             "--validation-sampling-seed",
             str(validation_sampling_seed),
         ]
+        if workers is not None:
+            evaluation_args.extend(["--workers", str(workers)])
         if validation_positive_cap is not None:
             evaluation_args.extend(["--validation-positive-cap", str(validation_positive_cap)])
         if validation_negative_cap is not None:
@@ -420,7 +415,7 @@ def run_full_experiment(
     "--workers",
     type=click.IntRange(min=1),
     default=None,
-    help="Override evaluation worker count.",
+    help="Override evaluation worker count. If omitted, evaluation.py chooses a CPU-based default.",
 )
 @click.option(
     "--limit",
@@ -494,8 +489,6 @@ def main(
     validation_sampling_seed: int,
 ) -> None:
     save_dir.mkdir(parents=True, exist_ok=True)
-    if workers is None:
-        workers = get_default_worker_count()
     if benchmark is not None:
         if limit is not None and sample_ids:
             raise click.UsageError("Use either --limit or --sample-ids, not both.")

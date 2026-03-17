@@ -51,7 +51,7 @@ class Config(BaseModel):
     MAX_CONSUMER_PROCESSES: int = Field(
         64,
         description=(
-            "Max worker processes; each worker holds a single sandbox and processes tasks serially"
+            "Upper bound for worker processes; effective count is also limited by available CPUs and sample count"
         ),
     )
     DEFAULT_EXECUTION_TIMEOUT: int = Field(

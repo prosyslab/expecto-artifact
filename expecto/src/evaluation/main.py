@@ -25,6 +25,7 @@ sys.path.insert(0, str(project_root))
 from src.evaluation.config import config
 from src.evaluation.consumer import worker_main
 from src.evaluation.models import Sample
+from src.evaluation.parallelism import get_available_cpu_count, resolve_worker_count
 from src.evaluation.producer import get_task_num, producer_main
 from src.evaluation.rerun_handler import (
     parse_rerun_from_file,
@@ -132,10 +133,19 @@ async def run_executor(
     progress_queue = ctx.Queue()
     results: list[Sample] = []
 
-    worker_limit = max(1, config.MAX_CONSUMER_PROCESSES)
-    estimated_parallelism = max(1, num_samples)
-    worker_count = min(worker_limit, estimated_parallelism)
-    logger.info("Spawning %d worker process(es).", worker_count)
+    available_cpu_count = get_available_cpu_count()
+    worker_count = resolve_worker_count(
+        num_samples=num_samples,
+        configured_limit=config.MAX_CONSUMER_PROCESSES,
+        available_cpu_count=available_cpu_count,
+    )
+    logger.info(
+        "Spawning %d worker process(es) (available_cpus=%d, configured_limit=%d, samples=%d).",
+        worker_count,
+        available_cpu_count,
+        config.MAX_CONSUMER_PROCESSES,
+        num_samples,
+    )
 
     worker_processes = []
     for index in range(worker_count):

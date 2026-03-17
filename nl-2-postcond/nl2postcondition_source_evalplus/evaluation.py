@@ -14,6 +14,7 @@ from models import (
     AggregatedResult,
     EvaluationResult,
 )
+from parallelism import get_scaled_worker_count
 from tqdm.asyncio import tqdm as atqdm
 
 from dataset_paths import get_evalplus_dataset_file
@@ -32,8 +33,7 @@ if hasattr(sys, "set_int_max_str_digits"):
 
 
 def get_worker_count() -> int:
-    cpu_count = os.cpu_count() or 1
-    return max(1, int(cpu_count * 0.8))
+    return get_scaled_worker_count(scale=0.8)
 
 
 def sanitize_task_id(task_id: str) -> str:
@@ -474,7 +474,7 @@ def main(
     validation_negative_cap: int | None,
     validation_sampling_seed: int,
 ):
-    worker_count = workers or get_worker_count()
+    worker_count = workers if workers is not None else get_worker_count()
     print(f"Running evaluation with {worker_count} workers")
     results = asyncio.run(
         evaluate_target_directory(

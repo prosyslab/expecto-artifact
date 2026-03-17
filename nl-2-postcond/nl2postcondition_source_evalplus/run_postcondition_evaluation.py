@@ -29,6 +29,7 @@ from evalplus.eval import (
     untrusted_postcondition_check,
 )
 from evalplus.gen.util import trusted_exec
+from parallelism import get_scaled_worker_count
 from response_preprocessing import code_sanitize, wrap_code_solution
 from tqdm import tqdm
 
@@ -927,7 +928,7 @@ class summaryStats:
 def runEvalofPostconditions(flags, postcondition_sample_dir, output_dir, problems):
     # First, set up the number of parallel workers
     if flags.parallel is None:
-        n_workers = max(1, multiprocessing.cpu_count() // 2)
+        n_workers = get_scaled_worker_count(scale=0.5)
     else:
         n_workers = flags.parallel
 
