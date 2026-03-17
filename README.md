@@ -44,6 +44,8 @@ docker run -it --name expecto-artifact prosyslab/expecto-artifact zsh
 
 ### Step 3. Create the `.env` file
 
+Expecto uses GPT-4.1-mini (OpenAI) as its LLM backend, so you need a valid
+OpenAI API key to run the experiments.
 Inside the container, change to `/workspace/expecto-artifact` and create a `.env` file with your OpenAI API key.
 
 ```bash
@@ -57,7 +59,7 @@ EOF
 
 Run the following script to confirm that the setup completed successfully.
 Make sure every item in the `Summary` section is marked as `[PASS]`.
-It takes about 2 minutes.
+**It takes about 2 minutes.**
 
 Command:
 ```bash
@@ -101,6 +103,7 @@ This test script checks the following:
 
 # 2. Directory structure
 The `expecto-artifact` repository has the following directory structure:
+
 ```text
 /workspace/expecto-artifact
 ├── README.md                          <- The top-level README (this file)
@@ -112,30 +115,30 @@ The `expecto-artifact` repository has the following directory structure:
     └── run_artifact.py                <- Main artifact runner
 ```
 
-Generated outputs from the artifact runner are written under:
+Generated outputs from the artifact runner are written under (★ indicates the main output files to check):
+
 ```text
 /workspace/data/experiment/artifact
 ├── target/                            <- Outputs for targeted reproduction
 │   │                                      (See Section 3 of this README)
 │   └── runs/                          <- Raw LLM outputs and raw evaluation
-│       │                                  results by benchmark and configuration
-│       ├── apps/                      <- APPS outputs
-│       ├── humaneval_plus/            <- HumanEval+ outputs
-│       └── defects4j/                 <- Defects4J outputs
+│       │                                  results for each benchmark and configuration
+│       └── <BENCHMARK>/<CONFIG>/      <- Outputs generated for the selected benchmark/configuration
+│           └── ★sample_results.json   <- JSON file summarizing generated sample results
 ├── full/                              <- Outputs for full paper reproduction
 │   │                                      (See Sections 4 and 5 of this README)
 │   ├── runs/                          <- Raw LLM outputs and raw evaluation
-│   │                                      results by benchmark and configuration
-│   └── figures/                       <- Generated tables and figures used in
-│       │                                  the paper
+│   │                                      results for each benchmark and configuration
+│   └── ★figures/                      <- Processed tables and figures from the paper,
+│       │                                  generated from `runs/`
 │       ├── rq1/                       <- Figures for RQ1
 │       ├── rq2/                       <- Figures for RQ2
 │       ├── rq3/                       <- Figures for RQ3
 │       └── rq4/                       <- Figures for RQ4
-├── mini/                              <- Outputs for reduced mini benchmarks
-│   │                                      (See Section 6 of this README)
-│   ├── runs/
-│   └── figures/
+└── mini/                              <- Outputs for reduced mini benchmarks
+    │                                      (See Section 6 of this README)
+    ├── runs/
+    └── figures/
 ```
 
 # 3. Reproducing specific benchmark problems
@@ -143,7 +146,7 @@ This section explains how to generate and evaluate a benchmark problem with a ch
 The paper uses three benchmarks, four Expecto configurations, and two NL2Postcond configurations.
 You can run any of combinations by specifying the problem ID.
 
-## 3.1 Reproducing the paper's motivating example: APPS problem `75`
+## 3.1 Reproducing the paper's motivating example (Fig. 2)
 To compare Expecto with the two NL2Postcond configurations (`nl2_base` and `nl2_simple`) on the paper's motivating example, run the following three commands:
 
 ```bash
@@ -203,10 +206,10 @@ Each `sample_results.json` entry contains:
 
 - `id`: the benchmark problem ID. Here it is always `75`.
 - `classification`: the evaluation result for the generated specification. Here, Expecto produces sound and complete (`S&C`). In contrast, the two NL2Postcond configurations produce sound and incomplete (`S`) or complete and unsound (`C`) specifications, respectively.
-- `nl_description`: the original natural-language description of the benchmark problem or method.
-- `specification`: the generated formal specification itself. Expecto emits a DSL specification like `predicate spec(...)`. NL2Postcond emits a single assertion like `assert ...`.
+- `nl_description`: the original natural-language description from the APPS benchmark prompt.
+- `specification`: the generated formal specification itself. Figure2에 등장하는 specification들은 이 필드에 저장되어 있습니다. Expecto emits a DSL specification like `predicate spec(...)`. NL2Postcond emits a single assertion like `assert ...`.
 
-*Note: LLM outputs are non-deterministic, so your generated specifications and classifications may differ from the paper version.*
+*Note: The fields and overall tendency should match, but the exact specification text and classification may differ because of LLM non-determinism.*
 
 ## 3.2 How to run other target problems
 ```bash
@@ -218,14 +221,15 @@ python3 scripts/run_artifact.py target \
 
 - `BENCHMARK` specifies which benchmark to generate. You can choose one of `apps`, `humaneval_plus`, or `defects4j`.
 - `CONFIG` specifies the Expecto or NL2Postcond configuration used in the paper.
-  - For Expecto, the following four configurations are available:
-    1. `mono`: the monolithic synthesis without top-down decomposition (section 4.3 in the paper)
-    2. `topdown`: the top-down synthesis without tree search (section 4.3 in the paper)
-    3. `ts`: the top-down synthesis with tree search (sections 4.2, 4.3, 4.4, and 4.5 in the paper)
-    4. `without_tc`: the top-down tree-search synthesis without test cases (section 4.4 in the paper)
-  - For NL2Postcond, the following two configurations are available:
-    1. `nl2_base`: the NL2Postcond base prompt strategy (sections 4.2 and 4.5 in the paper)
-    2. `nl2_simple`: the NL2Postcond simple prompt strategy (sections 4.2 and 4.5 in the paper)
+
+| Method | `CONFIG` value | Description | Used paper section(s) |
+| --- | --- | --- | --- |
+| Expecto | `mono` | Monolithic specification synthesis + Specification validation with test cases | 4.3 |
+| Expecto | `topdown` | Top-down specification synthesis + Specification validation with test cases | 4.3 |
+| Expecto | `ts` | Tree search specification synthesis + Specification validation with test cases | 4.2, 4.3, 4.4, 4.5 |
+| Expecto | `without_tc` | Tree search specification synthesis | 4.4 |
+| NL2Postcond | `nl2_base` | NL2Postcond base prompt strategy | 4.2, 4.5 |
+| NL2Postcond | `nl2_simple` | NL2Postcond simple prompt strategy | 4.2, 4.5 |
 - `SAMPLE-IDS` specifies the benchmark problem IDs as a comma-separated list. For example, you can provide `15,23,56`. You can find the available IDs for each benchmark in `/workspace/expecto-artifact/datasets/available_target_ids.csv`.
 
 ## 3.3 What this command does
@@ -255,7 +259,7 @@ It performs the generation and evaluation described in Section 3 on the full ben
 The total expected runtime of the `full` command is approximately 50 hours.
 
 ## 4.1 How to run
-It takes about 50 hours.
+**It takes about 50 hours.**
 ```bash
 python3 scripts/run_artifact.py full
 ```
@@ -284,7 +288,7 @@ This experiment compares Expecto against the two NL2Postcond prompt strategies (
 For Expecto, the comparison uses the tree-search-with-test-cases (`ts`) configuration.
 
 ### 5.1.1 How to run
-It takes about 12 hours from scratch, but if you have already run the `full` command, you can skip this step and inspect the generated outputs instead.
+**It takes about 12 hours from scratch, but if you have already run the `full` command, you can skip this step and inspect the generated outputs instead.** 
 ```bash
 python3 scripts/run_artifact.py rq1
 ```
@@ -305,7 +309,7 @@ This experiment evaluates the two main generation components of Expecto: top-dow
 It compares three Expecto configurations on the APPS and HumanEval+ benchmarks: monolithic generation (`mono`), top-down synthesis without tree search (`topdown`), and top-down synthesis with tree search (`ts`).
 
 ### 5.2.1 How to run
-It takes about 24 hours from scratch, but if you have already run the `full` command, you can skip this step and inspect the generated outputs instead.
+**It takes about 24 hours from scratch, but if you have already run the `full` command, you can skip this step and inspect the generated outputs instead.**
 ```bash
 python3 scripts/run_artifact.py rq2
 ```
@@ -323,7 +327,7 @@ This experiment measures how much user-provided test cases help Expecto during s
 It compares the full tree-search configuration with test cases (`ts`) against the version that does not use test cases (`without_tc`) on the APPS and HumanEval+ benchmarks.
 
 ### 5.3.1 How to run
-It takes about 18 hours from scratch, but if you have already run the `full` command, you can skip this step and inspect the generated outputs instead.
+**It takes about 18 hours from scratch, but if you have already run the `full` command, you can skip this step and inspect the generated outputs instead.**
 ```bash
 python3 scripts/run_artifact.py rq3
 ```
@@ -340,7 +344,7 @@ This experiment evaluates whether Expecto can generate bug-detecting specificati
 It compares Expecto with the two NL2Postcond prompt strategies (`nl2_base` and `nl2_simple`) on the `Defects4J` benchmark, using the tree-search configuration with test cases (`ts`) for Expecto.
 
 ### 5.4.1 How to run
-It takes about 12 hours from scratch, but if you have already run the `full` command, you can skip this step and inspect the generated outputs instead.
+**It takes about 12 hours from scratch, but if you have already run the `full` command, you can skip this step and inspect the generated outputs instead.**
 ```bash
 python3 scripts/run_artifact.py rq4
 ```
@@ -357,6 +361,8 @@ The generated table can be found at:
 
 This section explains the `mini` command, which runs a reduced version of the experiments on fixed subsets of the benchmarks used in the paper.
 It performs the same generation, evaluation, and figure/table export steps as the `full` command, but uses only 20 samples from each benchmark so that results can be produced much more quickly.
+
+We recommend running `mini` first if you want to check your setup produces reasonable results before committing to the ~50-hour full run.
 
 *Note: `mini` is not meant to reproduce the exact paper numbers. It is meant for quick inspection and trend checking.*
 
