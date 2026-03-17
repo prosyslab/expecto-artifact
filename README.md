@@ -387,7 +387,7 @@ The generated raw data and final output can be found at:
 This section explains the `mini` command, which runs a reduced version of the experiments on fixed subsets of the benchmarks used in the paper.
 It performs the same generation, evaluation, and figure/table export steps as the `full` command, but uses only 20 samples from each benchmark so that results can be produced much more quickly.
 
-We recommend running `mini` first if you want to check your setup produces reasonable results before committing to the ~50-hour full run.
+We recommend running `mini` first if you want to check your setup produces reasonable results before committing to the ~50-hour full run. **It takes 4.5 hours**.
 
 *Note: `mini` is not meant to reproduce the exact paper numbers. It is meant for quick inspection and trend checking.*
 
