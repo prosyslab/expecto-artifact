@@ -48,7 +48,7 @@ Expecto uses GPT-4.1-mini (OpenAI) as its LLM backend, so you need a valid
 OpenAI API key to run the experiments.
 Inside the container, change to `/workspace/expecto-artifact` and create a `.env` file with your OpenAI API key.
 
-*Note: An OpenAI API key will be provided through HotCRP.*
+*Note: An OpenAI API key will be provided through HotCRP comment*
 
 ```bash
 cd /workspace/expecto-artifact
@@ -105,7 +105,6 @@ This test script checks the following:
 
 ## 1.3 Notes before you start
 - LLM non-determinism: The generated specifications and their classifications may differ from those reported in the paper because of LLM non-determinism. However, the overall tendencies (e.g., Expecto producing more `S&C` specifications than NL2Postcond) should still hold.
-- DSL compiler bug fix: After the submission version, we found bugs in the DSL compiler that caused some specifications to be misclassified as `W` or `S` instead of `S&C`. We have fixed these bugs, so you may see more `S&C` specifications than those reported in the paper, especially for Expecto on HumanEval+ and Defects4J. However, the overall trends and conclusions should still hold.
 
 # 2. Directory structure
 The `expecto-artifact` repository has the following directory structure:
@@ -322,6 +321,9 @@ The generated raw data and final outputs can be found in:
 - Table 1 (RQ1 main comparison): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.rq1.table.pdf`
 - Fig. 8 (RQ1 threshold analysis): `/workspace/data/experiment/artifact/full/figures/rq1/evaluation.thresholds.pdf`
 
+### Notes on RQ1 results
+- **DSL compiler bug fix:** After the submission version, we found bugs in the DSL compiler that caused some specifications to be misclassified as `W` or `S` instead of `S&C`. We have fixed these bugs, so you may see more `S&C` specifications than those reported in the paper, especially for Expecto on HumanEval+. However, the overall trends and conclusions should still hold.
+
 ## 5.2 RQ2: Effectiveness of top-down synthesis with tree search
 This experiment evaluates the two main generation components of Expecto: top-down specification synthesis and tree search.
 It compares three Expecto configurations on the APPS and HumanEval+ benchmarks: monolithic generation (`mono`), top-down synthesis without tree search (`topdown`), and top-down synthesis with tree search (`ts`).
@@ -386,6 +388,9 @@ The generated raw data and final output can be found in:
   - `/workspace/data/experiment/artifact/full/runs/defects4j/nl2_base/sample_results.json`
   - `/workspace/data/experiment/artifact/full/runs/defects4j/nl2_simple/sample_results.json`
 - Table 2 (RQ4 Defects4J comparison): `/workspace/data/experiment/artifact/full/figures/rq4/evaluation.rq4.defects4j.table.pdf`
+
+### Notes on RQ4 results
+- **DSL compiler bug fix:** After the submission version, we found bugs in the DSL compiler that caused some specifications to be misclassified as `W` or `S` instead of `S&C`. We have fixed these bugs, so you may see more `S&C` specifications than those reported in the paper, especially for Expecto on Defects4J. However, the overall trends and conclusions should still hold.
 
 # 6. Running reduced benchmarks for quick inspection
 
