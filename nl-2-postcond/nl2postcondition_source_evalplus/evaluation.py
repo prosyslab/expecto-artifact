@@ -40,6 +40,12 @@ def sanitize_task_id(task_id: str) -> str:
     return task_id.replace("/", "__")
 
 
+def get_evaluation_log_dir(target_directory: str) -> Path:
+    log_dir = Path(target_directory) / "evaluation_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir
+
+
 def get_log_path(
     target_directory: str,
     task_id: str,
@@ -47,12 +53,38 @@ def get_log_path(
     phase: str,
     stream_name: str,
 ) -> str:
-    log_dir = os.path.join(target_directory, "evaluation_logs")
-    os.makedirs(log_dir, exist_ok=True)
-    return os.path.join(
-        log_dir,
-        f"{sanitize_task_id(task_id)}__sample_{response_num}__{phase}.{stream_name}.log",
+    return str(
+        get_evaluation_log_dir(target_directory)
+        / f"{sanitize_task_id(task_id)}__sample_{response_num}__{phase}.{stream_name}.log"
     )
+
+
+def write_aggregated_stderr_log(target_directory: str) -> Path:
+    log_dir = get_evaluation_log_dir(target_directory)
+    stderr_paths = sorted(log_dir.glob("*.stderr.log"))
+    non_empty_entries: list[tuple[Path, str]] = []
+
+    for stderr_path in stderr_paths:
+        content = stderr_path.read_text(encoding="utf-8")
+        if content:
+            non_empty_entries.append((stderr_path, content))
+
+    aggregate_path = Path(target_directory) / "stderr.log"
+    with aggregate_path.open("w", encoding="utf-8") as handle:
+        handle.write(f"stderr_log_files={len(stderr_paths)}\n")
+        handle.write(f"non_empty_stderr_logs={len(non_empty_entries)}\n")
+        if not non_empty_entries:
+            handle.write("No stderr output captured.\n")
+        else:
+            handle.write("\n")
+            for stderr_path, content in non_empty_entries:
+                handle.write(f"===== {stderr_path.name} =====\n")
+                handle.write(content)
+                if not content.endswith("\n"):
+                    handle.write("\n")
+                handle.write("\n")
+
+    return aggregate_path
 
 
 def load_dataset(dataset: str) -> dict:
@@ -74,47 +106,51 @@ def read_target_directory(target_directory: str) -> list[dict]:
 
 def get_eval_code_with_parser(assertion: str, signature: str, args, parser: str) -> str:
     signature = signature.split("\n")[0]
-    assertion = assertion.replace("return_value", "result").replace("assert", "return")
+    assertion = assertion.replace("returnValue", "result").replace("return_value", "result").replace("assert", "return")
     eval_code = f"""from typing import *
 import math
 import re
+import sys
 {parser}
 {signature}
 {indent(assertion, " " * 4)}
 
 true_cnt = 0
 false_cnt = 0
+error_cnt = 0
 """
     io_pairs = json.loads(args)
     for i, o in zip(io_pairs["inputs"], io_pairs["outputs"]):
         eval_code += "try:\n"
         eval_code += f"    v = postcondition(*parser({repr(i)}, {repr(o)}))\n"
         eval_code += "    if v == True:\n        true_cnt += 1\n    else:\n        false_cnt += 1\n"
-        eval_code += "except Exception:\n    false_cnt += 1\n"
-    eval_code += "print(f'{true_cnt} {false_cnt}', flush=True)\n"
+        eval_code += "except NameError as e:\n    print(e, file=sys.stderr)\n    false_cnt += 1\n"
+    eval_code += "print(f'{true_cnt} {false_cnt} {error_cnt}', flush=True)\n"
     return eval_code
 
 
 def get_eval_code_with_io_pairs(assertion: str, signature: str, io_pairs: str) -> str:
     io_pairs_dict = json.loads(io_pairs)
     signature = signature.split("\n")[0]
-    assertion = assertion.replace("return_value", "result").replace("assert", "return")
+    assertion = assertion.replace("returnValue", "result").replace("return_value", "result").replace("assert", "return")
     eval_code = f"""from typing import *
 import math
 import re
+import sys
 {signature}
 {indent(assertion, " " * 4)}
 
 true_cnt = 0
 false_cnt = 0
+error_cnt = 0
 """
     for i, o in zip(io_pairs_dict["inputs"], io_pairs_dict["outputs"]):
         input_args_str = ", ".join(repr(arg) for arg in i)
         eval_code += "try:\n"
         eval_code += f"    v = postcondition({input_args_str}, {repr(o)})\n"
         eval_code += "    if v == True:\n        true_cnt += 1\n    else:\n        false_cnt += 1\n"
-        eval_code += "except Exception:\n    false_cnt += 1\n"
-    eval_code += "print(f'{true_cnt} {false_cnt}', flush=True)\n"
+        eval_code += "except NameError as e:\n    print(f'Error: {e}', file=sys.stderr)\n    error_cnt += 1\n"
+    eval_code += "print(f'{true_cnt} {false_cnt} {error_cnt}', flush=True)\n"
     return eval_code
 
 
@@ -141,7 +177,7 @@ def normalize_output(content: bytes | str | None) -> str:
 
 def run_code_sync(
     code: str, num_of_tc: int, stdout_log_path: str, stderr_log_path: str
-) -> tuple[int, int, str]:
+) -> tuple[int, int, int, str]:
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py") as tmp:
         tmp.write(code)
         tmp.flush()
@@ -159,16 +195,14 @@ def run_code_sync(
         except subprocess.TimeoutExpired as exc:
             write_log(stdout_log_path, normalize_output(exc.stdout))
             write_log(stderr_log_path, normalize_output(exc.stderr) + "Timeout\n")
-            return 0, num_of_tc, f"Timeout. See logs: {stdout_log_path}, {stderr_log_path}"
+            return 0, 0, num_of_tc, f"Timeout. See logs: {stdout_log_path}, {stderr_log_path}"
 
         write_log(stdout_log_path, completed.stdout)
-        if completed.stderr:
-            write_log(stderr_log_path, completed.stderr)
-        elif os.path.exists(stderr_log_path):
-            os.unlink(stderr_log_path)
+        write_log(stderr_log_path, completed.stderr or "")
 
         if completed.returncode != 0:
             return (
+                0,
                 0,
                 num_of_tc,
                 "Process exited with code "
@@ -177,17 +211,18 @@ def run_code_sync(
 
         stdout_str = completed.stdout.strip()
         if not stdout_str:
-            return 0, num_of_tc, f"No stdout. See logs: {stdout_log_path}, {stderr_log_path}"
+            return 0, 0, num_of_tc, f"No stdout. See logs: {stdout_log_path}, {stderr_log_path}"
 
         processed = stdout_str.split()
-        if len(processed) != 2:
+        if len(processed) != 3:
             return (
+                0,
                 0,
                 num_of_tc,
                 f"Invalid stdout format: {stdout_str}. See logs: {stdout_log_path}, {stderr_log_path}",
             )
 
-        return int(processed[0]), int(processed[1]), "Success"
+        return int(processed[0]), int(processed[1]), int(processed[2]), "Success"
     finally:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp_path)
@@ -195,7 +230,7 @@ def run_code_sync(
 
 async def run_code(
     code: str, num_of_tc: int, stdout_log_path: str, stderr_log_path: str
-) -> tuple[int, int, str]:
+) -> tuple[int, int, int, str]:
     return await asyncio.to_thread(
         run_code_sync, code, num_of_tc, stdout_log_path, stderr_log_path
     )
@@ -288,6 +323,7 @@ async def evaluate_one_assertion(
     (
         true_cnt_correct,
         false_cnt_correct,
+        error_cnt_correct,
         msg_completeness,
     ) = await run_code(
         eval_code,
@@ -315,6 +351,7 @@ async def evaluate_one_assertion(
     (
         true_cnt_mutated,
         false_cnt_mutated,
+        error_cnt_mutated,
         msg_soundness,
     ) = await run_code(
         eval_code,
@@ -326,14 +363,18 @@ async def evaluate_one_assertion(
     return EvaluationResult(
         task_id=data["task_id"],
         assertion=assertion,
-        is_complete=(false_cnt_correct == 0 and true_cnt_correct > 0),
-        is_sound=false_cnt_mutated > true_cnt_mutated,
+        is_complete=(
+            false_cnt_correct == 0 and true_cnt_correct > 0 and error_cnt_correct == 0
+        ),
+        is_sound=false_cnt_mutated > 0.5 * sound_total and error_cnt_correct == 0,
         complete_ratio=true_cnt_correct / complete_total,
         sound_ratio=false_cnt_mutated / sound_total,
         true_cnt_correct=true_cnt_correct,
         false_cnt_correct=false_cnt_correct,
+        error_cnt_correct=error_cnt_correct,
         true_cnt_mutated=true_cnt_mutated,
         false_cnt_mutated=false_cnt_mutated,
+        error_cnt_mutated=error_cnt_mutated,
         msg_completeness=msg_completeness,
         msg_soundness=msg_soundness,
     )
@@ -492,6 +533,8 @@ def main(
     with open(os.path.join(target_directory, "aggregated_result.json"), "w") as f:
         agg_result = aggregate_results(results, exp_name)
         json.dump(agg_result.model_dump(), f, indent=4)
+    aggregate_stderr_log_path = write_aggregated_stderr_log(target_directory)
+    print(f"Wrote aggregated stderr log to {aggregate_stderr_log_path}")
     print(agg_result)
 
 

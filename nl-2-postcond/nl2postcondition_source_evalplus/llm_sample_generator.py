@@ -68,7 +68,14 @@ def load_postconditions(evaluated_post_conditions_file):
     return postconditions
 
 
-def prepare_prompt(exper_cfg, problem) -> str:
+def get_variable_usage_sentence(benchmark_name: str) -> str:
+    benchmark_name = benchmark_name.lower()
+    if "apps" in benchmark_name:
+        return "For variables, the ${toGenerateShort} should only use the input parameters defined in the function stub. Do not assume any additional variables or return values are defined like `return_value`."
+    return "For variables, the ${toGenerateShort} should only use the input parameters defined in the function stub and a hypothetical return value of the function, which we'll assume is stored in a variable `return_value`."
+
+
+def prepare_prompt(exper_cfg, problem, benchmark_name="") -> str:
     # Set all of the default values
     toGenerateFull = ""
     toGenerateShort = ""
@@ -127,6 +134,8 @@ def prepare_prompt(exper_cfg, problem) -> str:
     else:
         raise NotImplementedError
 
+    variableUsageSentence = get_variable_usage_sentence(benchmark_name)
+
     if exper_cfg.prompt_v == "base":
         return promptTemplate.substitute(
             codeStubAndDocstring=code,
@@ -136,6 +145,7 @@ def prepare_prompt(exper_cfg, problem) -> str:
             toGenerateShortCaps=toGenerateShortCaps,
             promptAdds=promptAdds,
             entrypoint=entrypoint,
+            variableUsageSentence=variableUsageSentence,
         )
 
     elif exper_cfg.prompt_v == "simple":
@@ -145,6 +155,7 @@ def prepare_prompt(exper_cfg, problem) -> str:
             toGenerateShort=toGenerateShort,
             toGenerateShortCaps=toGenerateShortCaps,
             entrypoint=entrypoint,
+            variableUsageSentence=variableUsageSentence,
         )
 
 
@@ -200,13 +211,13 @@ def ask(prompt, exper_cfg, log_only):
 
 
 def generate_one_completion(
-    exper_cfg, problem, task_id, run_num, log_only, postconditions=None
+    exper_cfg, problem, task_id, run_num, log_only, benchmark_name="", postconditions=None
 ):
     """
     This function gets and processes one call from the API
     """
 
-    prompt = prepare_prompt(exper_cfg, problem)
+    prompt = prepare_prompt(exper_cfg, problem, benchmark_name=benchmark_name)
 
     log_only(
         "🪅  Generating {} responses for the following prompt: \n {}".format(
@@ -282,7 +293,7 @@ def generate_one_completion(
 
 
 def generate_samples_for_problem(
-    exper_cfg, problem, task_id, log_only, postconditions=None
+    exper_cfg, problem, task_id, log_only, benchmark_name="", postconditions=None
 ):
     samples = []
     for run_num in range(exper_cfg.n_per_model_call):
@@ -296,6 +307,7 @@ def generate_samples_for_problem(
                     task_id,
                     run_num,
                     log_only,
+                    benchmark_name,
                     postconditions,
                 ),
             )
@@ -384,6 +396,7 @@ def main(cfg):
                 problems[task_id],
                 task_id,
                 log_only,
+                cfg.benchmarks.name,
                 None if all_postconditions is None else all_postconditions.get(task_id),
             ): task_id
             for task_id in task_ids_to_run
