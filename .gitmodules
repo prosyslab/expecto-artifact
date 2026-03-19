@@ -1,0 +1,8 @@
+[submodule "expecto"]
+	path = expecto
+	url = https://github.com/prosyslab/expecto.git
+	branch = main
+[submodule "nl-2-postcond"]
+	path = nl-2-postcond
+	url = https://github.com/prosyslab/nl-2-postcond.git
+	branch = main
