@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 PROJECT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PROJECT_DIR.parent.parent
 DATASETS_DIR = REPO_ROOT / "datasets"

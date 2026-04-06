@@ -5,11 +5,12 @@ import os
 import subprocess
 import sys
 import tempfile
-from textwrap import indent
 from pathlib import Path
+from textwrap import indent
 from typing import List, Optional
 
 import click
+from dataset_paths import get_evalplus_dataset_file
 from models import (
     AggregatedResult,
     EvaluationResult,
@@ -17,12 +18,10 @@ from models import (
 from parallelism import get_scaled_worker_count
 from tqdm.asyncio import tqdm as atqdm
 
-from dataset_paths import get_evalplus_dataset_file
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.append(str(PROJECT_ROOT))
 
-from validation_sampling import sample_io_pairs_payload, VALIDATION_SAMPLING_MODES
+from validation_sampling import VALIDATION_SAMPLING_MODES, sample_io_pairs_payload
 
 PPX_SAMPLE_JSONL = "preprocessed_samples.jsonl"
 EVAL_TIMEOUT_SECONDS = 30

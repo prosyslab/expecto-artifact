@@ -14,8 +14,8 @@ import prompts
 from benchmarks import load_benchmarks
 from evalplus.data import write_jsonl
 from log import make_header
-from openai import OpenAI
 from omegaconf import OmegaConf
+from openai import OpenAI
 from parallelism import get_scaled_worker_count
 from tenacity import Retrying, stop_after_attempt, wait_random_exponential
 

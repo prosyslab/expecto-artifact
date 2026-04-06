@@ -3,7 +3,6 @@ import logging
 import re
 import sys
 from pathlib import Path
-from time import sleep
 
 from inspect_ai.model import ChatMessageSystem, ChatMessageUser, get_model
 from inspect_ai.solver import Generate, Solver, TaskState, solver
@@ -22,6 +21,7 @@ from src.utils.dsl import Tree
 from src.utils.dsl import template_generation as dsl_template_generation
 from src.utils.monad import Err, Ok, Result
 from src.utils.sat_check import sat_check_examples
+
 
 @solver(name="monolithic")
 def monolithic(

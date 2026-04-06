@@ -1,7 +1,6 @@
 import argparse
 import glob
 import json
-import multiprocessing
 import os
 import pickle
 import shutil
@@ -70,7 +69,6 @@ def get_groundtruth(problems, hashcode):
 
     with open(cache_file, "wb") as f:
         pickle.dump(expected_output, f)
-    import sys
 
     sys.set_int_max_str_digits(0)
     # json.dump(expected_output, open(f"/app/expected_output.json", "w"))
@@ -501,7 +499,7 @@ def evaluate_post_condition_soundness(
     base_correct = []
     new_correct = []
 
-    print_and_log("😊  Calculating pass@k 😊".format(result_path))
+    print_and_log("😊  Calculating pass@k 😊")
 
     for res in soundness_results["eval"].values():
         bc = sum([r[0] == SUCCESS for r in res["base"]])

@@ -4,8 +4,8 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
-from evalplus.data import get_human_eval_plus
 from dataset_paths import get_defects4j_dataset_file
+from evalplus.data import get_human_eval_plus
 
 logger = getLogger(__name__)
 

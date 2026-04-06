@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 TASKS_DIR = Path(__file__).resolve().parent
 EXPECTO_ROOT = TASKS_DIR.parent.parent
 REPO_ROOT = EXPECTO_ROOT.parent

@@ -4,7 +4,11 @@ import sys
 from pathlib import Path
 
 import click
-from run_nl2postcond import log_command, log_ignored_nl2postcond_options, run_nl2postcond_for_task
+from run_nl2postcond import (
+    log_command,
+    log_ignored_nl2postcond_options,
+    run_nl2postcond_for_task,
+)
 
 TASK = "humaneval_plus"
 EPOCHS = 1

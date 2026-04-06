@@ -6,7 +6,12 @@ from typing import Optional, Set
 from inspect_ai.log import read_eval_log_async
 from rich.console import Console
 
-from .models import EvaluationResult, Sample, load_evaluation_result, sample_id_from_sample
+from .models import (
+    EvaluationResult,
+    Sample,
+    load_evaluation_result,
+    sample_id_from_sample,
+)
 
 logger = logging.getLogger(__name__)
 console = Console()
