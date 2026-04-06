@@ -17,24 +17,30 @@ from src.evaluation.config import config, sample_id_var
 from src.evaluation.models import ExecutionResult
 
 # Global semaphore - will be initialized in main.py
-sandbox_semaphore: Optional[asyncio.Semaphore] = asyncio.Semaphore(12)
-subprocess_semaphore: Optional[asyncio.Semaphore] = asyncio.Semaphore(12)
+subprocess_semaphore: Optional[asyncio.Semaphore] = None
+cross_process_subprocess_semaphore: Optional[Any] = None
 
 
-def init_sandbox_semaphore(max_sandboxes: int) -> None:
-    """Initialize the sandbox semaphore. Should be called from main.py"""
-    global sandbox_semaphore
-    sandbox_semaphore = asyncio.Semaphore(max_sandboxes)
+def init_subprocess_semaphore(
+    max_subprocesses: Optional[int] = None,
+    *,
+    cross_process_semaphore: Optional[Any] = None,
+) -> None:
+    """Initialize the subprocess limiter.
 
+    If a cross-process semaphore is provided, it is used for global coordination
+    across worker processes. Otherwise an event-loop-local asyncio.Semaphore is used.
+    """
+    global subprocess_semaphore, cross_process_subprocess_semaphore
+    cross_process_subprocess_semaphore = cross_process_semaphore
+    if cross_process_subprocess_semaphore is not None:
+        return
 
-def init_subprocess_semaphore() -> None:
-    """Initialize the subprocess semaphore. Should be called from main.py"""
-    global subprocess_semaphore
-    subprocess_semaphore = asyncio.Semaphore(config.MAX_SUBPROCESS_CONCURRENT)
+    max_value = max(1, max_subprocesses or config.MAX_SUBPROCESS_CONCURRENT)
+    subprocess_semaphore = asyncio.Semaphore(max_value)
 
 
 def initialize():
-    init_sandbox_semaphore(config.MAX_SANDBOXES)
     init_subprocess_semaphore()
     loop = asyncio.get_running_loop()
     event = asyncio.Event()
@@ -282,13 +288,6 @@ class Sandbox:
             _active_sandboxes.discard(self)
 
     async def __aenter__(self) -> "Sandbox":
-        if sandbox_semaphore is None:
-            raise RuntimeError(
-                "Sandbox semaphore not initialized. Call init_sandbox_semaphore() first."
-            )
-        await sandbox_semaphore.acquire()
-        logger.debug(f"Get semaphore for sandbox {self.sandbox_id}")
-
         try:
             # Create sandbox directory
             self._ensure_sandbox_dir()
@@ -296,15 +295,10 @@ class Sandbox:
             return self
         except Exception as e:
             logger.error(f"Failed to create sandbox {self.sandbox_id}: {e}")
-            # Release semaphore if we acquired it but failed to create sandbox
-            if sandbox_semaphore is not None:
-                sandbox_semaphore.release()
             raise
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         await self.cleanup()
-        if sandbox_semaphore is not None:
-            sandbox_semaphore.release()
 
 
 # Signal handlers and cleanup functions
@@ -395,12 +389,30 @@ async def run_subprocess(
     Returns:
         Tuple of (exit_code, stdout, stderr)
     """
-    if subprocess_semaphore is None:
-        raise RuntimeError(
-            "Subprocess semaphore not initialized. Call init_subprocess_semaphore() first."
-        )
+    async def acquire_slot() -> None:
+        if cross_process_subprocess_semaphore is not None:
+            loop = asyncio.get_running_loop()
+            while not cross_process_subprocess_semaphore.acquire(block=False):
+                await asyncio.sleep(0.001)
+            return
 
-    async with subprocess_semaphore:
+        if subprocess_semaphore is None:
+            raise RuntimeError(
+                "Subprocess semaphore not initialized. Call init_subprocess_semaphore() first."
+            )
+        await subprocess_semaphore.acquire()
+
+    def release_slot() -> None:
+        if cross_process_subprocess_semaphore is not None:
+            cross_process_subprocess_semaphore.release()
+            return
+
+        if subprocess_semaphore is None:
+            return
+        subprocess_semaphore.release()
+
+    await acquire_slot()
+    try:
         logger.debug(f"Running command: {' '.join(cmd_args)} in cwd: {cwd}")
         stdin_pipe = asyncio.subprocess.PIPE if stdin is not None else None
         process = await asyncio.create_subprocess_exec(
@@ -416,6 +428,11 @@ async def run_subprocess(
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
                 process.communicate(input_bytes),
                 timeout=timeout,
+            )
+            return (
+                process.returncode if process.returncode is not None else -1,
+                stdout_bytes.decode(errors="replace").strip(),
+                stderr_bytes.decode(errors="replace").strip(),
             )
         except asyncio.TimeoutError:
             logger.warning(f"Process {' '.join(cmd_args)} timed out. Terminating...")
@@ -438,12 +455,6 @@ async def run_subprocess(
             finally:
                 if process.stdin is not None:
                     process.stdin.close()
-            raise  # Re-raise the TimeoutError to be handled by the caller
-
-        return (
-            process.returncode if process.returncode is not None else -1,
-            stdout_bytes.decode(errors="replace").strip(),
-            stderr_bytes.decode(errors="replace").strip(),
-        )
-
-
+            raise
+    finally:
+        release_slot()

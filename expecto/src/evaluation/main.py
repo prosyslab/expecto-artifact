@@ -139,6 +139,7 @@ async def run_executor(
         configured_limit=config.MAX_CONSUMER_PROCESSES,
         available_cpu_count=available_cpu_count,
     )
+    subprocess_semaphore = ctx.Semaphore(config.MAX_SUBPROCESS_CONCURRENT)
     logger.info(
         "Spawning %d worker process(es) (available_cpus=%d, configured_limit=%d, samples=%d).",
         worker_count,
@@ -151,7 +152,7 @@ async def run_executor(
     for index in range(worker_count):
         process = ctx.Process(
             target=worker_main,
-            args=(task_queue, result_queue, scorers),
+            args=(task_queue, result_queue, scorers, subprocess_semaphore),
             name=f"consumer-worker-{index}",
         )
         process.daemon = True

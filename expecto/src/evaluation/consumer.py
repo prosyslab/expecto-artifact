@@ -7,7 +7,7 @@ from inspect_ai.log import EvalSample
 
 from src.evaluation.config import sample_id_var
 from src.evaluation.models import Sample as EvaluationSample
-from src.evaluation.sandbox import Sandbox
+from src.evaluation.sandbox import Sandbox, init_subprocess_semaphore
 from src.evaluation.scorer import defined_scorers, get_scorer
 
 logger = logging.getLogger(__name__)
@@ -86,6 +86,7 @@ def worker_main(
     task_queue: "mp.JoinableQueue[Optional[EvalSample]]",
     result_queue: "mp.Queue[Optional[EvaluationSample]]",
     scorers_spec: str,
+    subprocess_limiter: Optional[Any] = None,
 ) -> None:
     """
     Worker process entry point.
@@ -96,6 +97,7 @@ def worker_main(
         scorers_spec: Comma-separated scorer configuration string.
     """
     try:
+        init_subprocess_semaphore(cross_process_semaphore=subprocess_limiter)
         worker_scorer = WorkerScorer(scorers_spec)
     except Exception:
         logger.exception("Failed to initialize worker scorer.")
