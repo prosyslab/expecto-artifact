@@ -10,6 +10,11 @@ import weakref
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+try:
+    import resource
+except ImportError:  # pragma: no cover - platform dependent
+    resource = None
+
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
@@ -19,6 +24,7 @@ from src.evaluation.models import ExecutionResult
 # Global semaphore - will be initialized in main.py
 subprocess_semaphore: Optional[asyncio.Semaphore] = None
 cross_process_subprocess_semaphore: Optional[Any] = None
+PROCESS_MEMORY_LIMIT_BYTES = 3 * 1024 * 1024 * 1024
 
 
 def init_subprocess_semaphore(
@@ -49,6 +55,9 @@ def initialize():
 
 
 logger = logging.getLogger(__name__)
+
+# Per-process memory cap for sandboxed execution (3GB).
+MAX_PROCESS_MEMORY_BYTES = 3 * 1024 * 1024 * 1024
 
 # Registry to keep track of active sandboxes
 _active_sandboxes: weakref.WeakSet["Sandbox"] = weakref.WeakSet()
@@ -199,12 +208,21 @@ class Sandbox:
                 f"Exit: {exit_code}, Duration: {duration:.2f}s"
             )
 
-            if exit_code == 137:  # OOM case
+            stderr_lower = stderr.lower() if stderr else ""
+            is_oom = (
+                exit_code in (-9, 137)
+                or "out of memory" in stderr_lower
+                or "memoryerror" in stderr_lower
+            )
+            if is_oom:
                 stderr = "Out of memory"
+                status = "timeout"
+            else:
+                status = "success" if exit_code == 0 else "failure"
 
             return ExecutionResult(
                 sample_id=sample_id_var.get(),
-                status="success" if exit_code == 0 else "failure",
+                status=status,
                 stdout=stdout,
                 stderr=stderr,
                 exit_code=exit_code,
@@ -414,6 +432,13 @@ async def run_subprocess(
     await acquire_slot()
     try:
         logger.debug(f"Running command: {' '.join(cmd_args)} in cwd: {cwd}")
+
+        def apply_memory_limit() -> None:
+            if resource is None or os.name != "posix":
+                return
+
+            resource.setrlimit(resource.RLIMIT_AS, (MAX_PROCESS_MEMORY_BYTES, MAX_PROCESS_MEMORY_BYTES))
+
         stdin_pipe = asyncio.subprocess.PIPE if stdin is not None else None
         process = await asyncio.create_subprocess_exec(
             *cmd_args,
@@ -422,6 +447,7 @@ async def run_subprocess(
             stdin=stdin_pipe,
             cwd=cwd,
             close_fds=True,
+            preexec_fn=apply_memory_limit if os.name == "posix" and resource is not None else None,
         )
         try:
             input_bytes = stdin.encode() if stdin is not None else None
