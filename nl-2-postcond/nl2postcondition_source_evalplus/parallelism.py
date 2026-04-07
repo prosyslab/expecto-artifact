@@ -1,15 +1,17 @@
 import os
 
+MAX_AUTO_WORKERS = 64
+
 
 def get_available_cpu_count() -> int:
     """Return the number of CPUs available to the current process."""
     try:
         if hasattr(os, "sched_getaffinity"):
-            return max(1, len(os.sched_getaffinity(0)))
+            return max(1, min(len(os.sched_getaffinity(0)), MAX_AUTO_WORKERS))
     except (AttributeError, OSError):
         pass
 
-    return max(1, os.cpu_count() or 1)
+    return max(1, min(os.cpu_count() or 1, MAX_AUTO_WORKERS))
 
 
 def get_scaled_worker_count(scale: float = 1.0, maximum: int | None = None) -> int:
