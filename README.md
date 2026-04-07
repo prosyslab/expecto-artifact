@@ -10,7 +10,7 @@ The experiments in the paper were conducted with the following setup:
 - Ubuntu 22.04
 - Docker 24.0.2
 - 64 CPU cores (Xeon Gold 6226R)
-- 512 GB RAM
+- 128 GB RAM
 - 256 GB storage
 
 ## 1.2 Setup with Docker
@@ -18,13 +18,13 @@ The experiments in the paper were conducted with the following setup:
 ### Step 1. Pull or load the Docker image
 
 First, obtain the Docker image that includes the datasets, dependencies, and experiment code.
-Pulling the image is the easiest option.
+Pulling the image is the easiest option:
 
 ```bash
 docker pull prosyslab/expecto-artifact
 ```
 
-If you downloaded `expecto-artifact.tar.gz` from Zenodo, you can load it instead.
+If you downloaded `expecto-artifact.tar.gz` from Zenodo, you can load the image instead:
 
 ```bash
 gunzip -c expecto-artifact.tar.gz | docker load
@@ -33,13 +33,48 @@ gunzip -c expecto-artifact.tar.gz | docker load
 You can verify that the image was pulled or loaded correctly by running:
 ```bash
 docker images | grep expecto-artifact
-> prosyslab/expecto-artifact   latest    ...
 ```
 
-### Step 2. Start the container
+Expected output:
+```text
+prosyslab/expecto-artifact   latest    ...
+```
+
+### Step 1 (Alternative). Set up without Docker using Conda
+
+If Docker is not available, you can set up the environment using Conda instead.
 
 ```bash
+# clone the repository
+git clone https://github.com/prosyslab/expecto-artifact
+
+# create the Conda environment
+conda env create -f environment.yml
+conda activate expecto-artifact
+
+# install dependencies
+bash setup.sh
+
+# reactivate the Conda environment to apply environment variables
+conda deactivate
+conda activate expecto-artifact
+
+# download the datasets from Zenodo
+wget https://zenodo.org/records/19083598/files/datasets.tar.gz?download=1 -O datasets.tar.gz
+tar -xzf datasets.tar.gz
+```
+
+
+### Step 2. Start the container / activate conda environment
+
+If you used Docker in Step 1:
+```bash
 docker run -it --name expecto-artifact prosyslab/expecto-artifact zsh
+```
+
+Otherwise:
+```bash
+conda activate expecto-artifact
 ```
 
 ### Step 3. Create the `.env` file

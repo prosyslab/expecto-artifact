@@ -2,6 +2,7 @@ import asyncio
 import json
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 import click
@@ -16,7 +17,8 @@ load_dotenv(PROJECT_ROOT / ".env")
 from defects4j_generation import run_generation
 
 MODEL_NAME = "openai/gpt-4.1-mini"
-DEFAULT_OUTPUT_DIR = Path("/workspace/nl-2-postcond/defects4j")
+WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
+DEFAULT_OUTPUT_DIR = WORKSPACE_DIR / "nl-2-postcond" / "defects4j"
 DEFAULT_DATASET_PATH = PROJECT_ROOT / "datasets" / "defects4j.jsonl"
 VALIDATOR_SCRIPT = NL2POSTCOND_ROOT / "defects4j_assertion_validator.py"
 VALID_PROMPT_VARIANTS = {
@@ -70,7 +72,9 @@ def run_validation(
     test_timeout: int,
     max_concurrency: int,
 ) -> None:
-    preferred_inputs = [input_dir / f"{prompt_version}.jsonl" for prompt_version in prompt_versions]
+    preferred_inputs = [
+        input_dir / f"{prompt_version}.jsonl" for prompt_version in prompt_versions
+    ]
     missing_inputs = [path.name for path in preferred_inputs if not path.is_file()]
     if missing_inputs:
         missing_display = ", ".join(missing_inputs)

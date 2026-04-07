@@ -20,12 +20,13 @@ import expecto.src.tasks as T
 from logger import get_logger
 
 load_dotenv(project_root / ".env")
+WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
 
 COMPOSE_FILE = "expecto/docker/apps.compose.yaml"
 DEFAULT_BASE_DIRS = {
-    "humaneval_plus": "/workspace/data/humaneval",
-    "apps_verified": "/workspace/data/apps",
-    "defects4j": "/workspace/data/defects4j",
+    "humaneval_plus": str(WORKSPACE_DIR / "data" / "humaneval"),
+    "apps_verified": str(WORKSPACE_DIR / "data" / "apps"),
+    "defects4j": str(WORKSPACE_DIR / "data" / "defects4j"),
 }
 
 sys.set_int_max_str_digits(10000000)

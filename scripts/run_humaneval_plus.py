@@ -15,7 +15,8 @@ EPOCHS = 1
 FIXED_MODEL = "openai/gpt-4.1-mini"
 FIXED_TEMPERATURE = 0.2
 SOLVERS = ["monolithic", "tree_search", "nl2postcond"]
-DEFAULT_BASE_DIR = "/workspace/data/humaneval"
+WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
+DEFAULT_BASE_DIR = str(WORKSPACE_DIR / "data" / "humaneval")
 
 
 def run_humaneval_plus_with_nl2postcond(

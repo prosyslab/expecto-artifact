@@ -1,13 +1,15 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import click
 
 TASK = "defects4j"
 EPOCHS = 1
 FIXED_MODEL = "openai/gpt-4.1-mini"
-DEFAULT_BASE_DIR = "/workspace/data/experiment/defects4j"
+WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
+DEFAULT_BASE_DIR = str(WORKSPACE_DIR / "data" / "experiment" / "defects4j")
 
 
 @click.command()

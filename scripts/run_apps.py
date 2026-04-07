@@ -15,7 +15,8 @@ EPOCHS = 1
 FIXED_MODEL = "openai/gpt-4.1-mini"
 FIXED_TEMPERATURE = 0.2
 SOLVERS = ["monolithic", "tree_search", "nl2postcond"]
-DEFAULT_BASE_DIR = "/workspace/data/apps"
+WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
+DEFAULT_BASE_DIR = str(WORKSPACE_DIR / "data" / "apps")
 
 
 def run_apps_with_nl2postcond(

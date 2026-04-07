@@ -7,32 +7,33 @@ ARG USER_GID=1000
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Los_Angeles
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV WORKSPACE_DIR=/workspace
 
 # Install shared system dependencies used across the workspace.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
-        curl \
-        ca-certificates \
-        cpanminus \
-        git \
-        gnupg \
-        make \
-        openjdk-11-jdk \
-        perl \
-        software-properties-common \
-        subversion \
-        sudo \
-        tmux \
-        unzip \
-        wget \
-        z3 \
-        openssh-client \
-        zsh \
-        tmux \
-        vim \
-        wget \
-        htop \
+    build-essential \
+    curl \
+    ca-certificates \
+    cpanminus \
+    git \
+    gnupg \
+    make \
+    openjdk-11-jdk \
+    perl \
+    software-properties-common \
+    subversion \
+    sudo \
+    tmux \
+    unzip \
+    wget \
+    z3 \
+    openssh-client \
+    zsh \
+    tmux \
+    vim \
+    wget \
+    htop \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone \
     && apt-get clean \
@@ -42,9 +43,9 @@ RUN apt-get update \
 RUN add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        python3.12 \
-        python3.12-venv \
-        python3.12-dev \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
     && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12 \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python3 \
     && ln -sf /usr/bin/python3.12 /usr/local/bin/python \

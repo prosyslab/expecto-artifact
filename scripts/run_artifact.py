@@ -4,6 +4,7 @@ import json
 import shutil
 import subprocess
 import sys
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
@@ -12,7 +13,8 @@ import click
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PYTHON_BIN = sys.executable
-DEFAULT_OUTPUT_ROOT = Path("/workspace/data/experiment/artifact")
+WORKSPACE_DIR = os.environ.get("WORKSPACE_DIR", str(PROJECT_ROOT.parent))
+DEFAULT_OUTPUT_ROOT = Path(WORKSPACE_DIR) / "data" / "experiment" / "artifact"
 STANDARD_PROFILE_NAME = "full"
 MINI_PROFILE_NAME = "mini"
 TARGET_PROFILE_NAME = "target"
@@ -224,7 +226,9 @@ def _serialize_sample_ids(sample_ids: Sequence[str] | None) -> str | None:
 def _parse_sample_ids(sample_ids: str | None) -> list[str] | None:
     if sample_ids is None:
         return None
-    parsed = [sample_id.strip() for sample_id in sample_ids.split(",") if sample_id.strip()]
+    parsed = [
+        sample_id.strip() for sample_id in sample_ids.split(",") if sample_id.strip()
+    ]
     return parsed or None
 
 
@@ -255,7 +259,9 @@ def _resolve_expecto_variant(
     )
 
 
-def _validation_sampling_kwargs(validation_limit: int | None) -> dict[str, int | str | None]:
+def _validation_sampling_kwargs(
+    validation_limit: int | None,
+) -> dict[str, int | str | None]:
     if validation_limit is None:
         return {
             "validation_sampling_mode": None,
@@ -603,13 +609,42 @@ def build_rq_units(
             units.extend(
                 [
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "ts", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
+                        layout,
+                        benchmark,
+                        "ts",
+                        rq,
+                        limit,
+                        sample_ids,
+                        validation_sampling_mode,
+                        validation_positive_cap,
+                        validation_negative_cap,
+                        validation_sampling_seed,
+                        expecto_n_completions,
+                        expecto_max_attempts,
                     ),
                     _make_evalplus_nl2_unit(
-                        layout, benchmark, "nl2_base", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed
+                        layout,
+                        benchmark,
+                        "nl2_base",
+                        rq,
+                        limit,
+                        sample_ids,
+                        validation_sampling_mode,
+                        validation_positive_cap,
+                        validation_negative_cap,
+                        validation_sampling_seed,
                     ),
                     _make_evalplus_nl2_unit(
-                        layout, benchmark, "nl2_simple", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed
+                        layout,
+                        benchmark,
+                        "nl2_simple",
+                        rq,
+                        limit,
+                        sample_ids,
+                        validation_sampling_mode,
+                        validation_positive_cap,
+                        validation_negative_cap,
+                        validation_sampling_seed,
                     ),
                 ]
             )
@@ -621,13 +656,46 @@ def build_rq_units(
             units.extend(
                 [
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "mono", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
+                        layout,
+                        benchmark,
+                        "mono",
+                        rq,
+                        limit,
+                        sample_ids,
+                        validation_sampling_mode,
+                        validation_positive_cap,
+                        validation_negative_cap,
+                        validation_sampling_seed,
+                        expecto_n_completions,
+                        expecto_max_attempts,
                     ),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "topdown", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
+                        layout,
+                        benchmark,
+                        "topdown",
+                        rq,
+                        limit,
+                        sample_ids,
+                        validation_sampling_mode,
+                        validation_positive_cap,
+                        validation_negative_cap,
+                        validation_sampling_seed,
+                        expecto_n_completions,
+                        expecto_max_attempts,
                     ),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "ts", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
+                        layout,
+                        benchmark,
+                        "ts",
+                        rq,
+                        limit,
+                        sample_ids,
+                        validation_sampling_mode,
+                        validation_positive_cap,
+                        validation_negative_cap,
+                        validation_sampling_seed,
+                        expecto_n_completions,
+                        expecto_max_attempts,
                     ),
                 ]
             )
@@ -639,10 +707,32 @@ def build_rq_units(
             units.extend(
                 [
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "ts", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
+                        layout,
+                        benchmark,
+                        "ts",
+                        rq,
+                        limit,
+                        sample_ids,
+                        validation_sampling_mode,
+                        validation_positive_cap,
+                        validation_negative_cap,
+                        validation_sampling_seed,
+                        expecto_n_completions,
+                        expecto_max_attempts,
                     ),
                     _make_evalplus_expecto_unit(
-                        layout, benchmark, "without_tc", rq, limit, sample_ids, validation_sampling_mode, validation_positive_cap, validation_negative_cap, validation_sampling_seed, expecto_n_completions, expecto_max_attempts
+                        layout,
+                        benchmark,
+                        "without_tc",
+                        rq,
+                        limit,
+                        sample_ids,
+                        validation_sampling_mode,
+                        validation_positive_cap,
+                        validation_negative_cap,
+                        validation_sampling_seed,
+                        expecto_n_completions,
+                        expecto_max_attempts,
                     ),
                 ]
             )

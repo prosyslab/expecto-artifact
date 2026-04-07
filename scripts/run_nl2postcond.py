@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 NL2POSTCOND_ROOT = PROJECT_ROOT / "nl-2-postcond" / "nl2postcondition_source_evalplus"
 DATASETS_ROOT = PROJECT_ROOT / "datasets"
-DEFAULT_SAVE_DIR = Path("/workspace/data")
+WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
+DEFAULT_SAVE_DIR = WORKSPACE_DIR / "data"
 TIMEOUT_SECONDS = 60 * 60 * 24 * 2
 
 NL2POSTCOND_EXPERIMENTS = [

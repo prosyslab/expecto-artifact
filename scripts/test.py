@@ -3,13 +3,17 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 import click
 from dotenv import dotenv_values
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTPUT_ROOT = Path("/workspace/data/experiment/artifact/test-smoke")
+WORKSPACE_DIR = os.environ.get("WORKSPACE_DIR", str(PROJECT_ROOT.parent))
+DEFAULT_OUTPUT_ROOT = (
+    Path(WORKSPACE_DIR) / "data" / "experiment" / "artifact" / "test-smoke"
+)
 REQUIRED_DATASET_FILES = (
     PROJECT_ROOT / "datasets" / "apps.json",
     PROJECT_ROOT / "datasets" / "human_eval_plus.json",
@@ -116,7 +120,9 @@ def _check_dataset_files() -> bool:
     ok = True
     for dataset_path in REQUIRED_DATASET_FILES:
         exists = dataset_path.is_file()
-        _print_status(exists, "dataset file", str(dataset_path.relative_to(PROJECT_ROOT)))
+        _print_status(
+            exists, "dataset file", str(dataset_path.relative_to(PROJECT_ROOT))
+        )
         ok = ok and exists
     return ok
 
@@ -168,9 +174,15 @@ def _check_nl2_markers(output_root: Path) -> bool:
     ok = True
     for relative_dir in RQ1_NL2_MARKER_DIRS:
         run_dir = output_root / relative_dir
-        matches = sorted(run_dir.rglob("aggregated_result.json")) if run_dir.exists() else []
+        matches = (
+            sorted(run_dir.rglob("aggregated_result.json")) if run_dir.exists() else []
+        )
         exists = bool(matches)
-        detail = str(matches[0]) if exists else f"missing aggregated_result.json under {run_dir}"
+        detail = (
+            str(matches[0])
+            if exists
+            else f"missing aggregated_result.json under {run_dir}"
+        )
         _print_status(exists, "NL2Postcond marker", detail)
         ok = ok and exists
     return ok
@@ -314,7 +326,9 @@ def main(output_root: Path) -> None:
         ]
         expecto_issue = None
         if missing_expecto:
-            expecto_issue = "Missing Expecto result markers: " + ", ".join(missing_expecto)
+            expecto_issue = "Missing Expecto result markers: " + ", ".join(
+                missing_expecto
+            )
         _record_check(
             checks,
             issues,
@@ -353,8 +367,8 @@ def main(output_root: Path) -> None:
         ]
         sample_results_issue = None
         if missing_sample_results:
-            sample_results_issue = (
-                "Missing sample result files: " + ", ".join(missing_sample_results)
+            sample_results_issue = "Missing sample result files: " + ", ".join(
+                missing_sample_results
             )
         _record_check(
             checks,

@@ -1,0 +1,37 @@
+name: expecto-artifact
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.12
+  - pip
+  - setuptools
+  - wheel
+
+  - c-compiler
+  - cxx-compiler
+  - make
+  - cmake
+  - pkg-config
+
+  - git
+  - curl
+  - wget
+  - unzip
+  - perl
+  - perl-app-cpanminus
+  - perl-dbi
+  - perl-module-build
+  - perl-uri
+  - subversion
+  - openjdk=11
+  - openssh
+  - ca-certificates
+
+  - z3-solver
+
+  - zsh
+  - tmux
+  - htop
+  - vim
