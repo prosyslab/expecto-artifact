@@ -43,6 +43,7 @@ prosyslab/expecto-artifact   latest    ...
 ### Step 1 (Alternative). Set up without Docker using Conda
 
 If Docker is not available, you can set up the environment using Conda instead.
+It takes about 15-20 minutes for installing and building dependencies.
 
 ```bash
 # clone the repository
