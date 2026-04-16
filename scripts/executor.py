@@ -23,6 +23,7 @@ load_dotenv(project_root / ".env")
 WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
 
 COMPOSE_FILE = "expecto/docker/apps.compose.yaml"
+FIGURE_GENERATOR = project_root / "analyzer" / "figure_generator.py"
 DEFAULT_BASE_DIRS = {
     "humaneval_plus": str(WORKSPACE_DIR / "data" / "humaneval"),
     "apps_verified": str(WORKSPACE_DIR / "data" / "apps"),
@@ -53,6 +54,27 @@ def allocate_experiment_dir(base_dir: str, exp_name: str) -> Path:
     return candidate
 
 
+def export_sample_results_json(
+    *,
+    run_dir: Path,
+    benchmark: str,
+    variant: str,
+    logger: logging.Logger,
+) -> None:
+    args = [
+        sys.executable,
+        str(FIGURE_GENERATOR),
+        "export-target-sample-json",
+        str(run_dir),
+        "--benchmark",
+        benchmark,
+        "--variant",
+        variant,
+    ]
+    logger.info("Running sample-results export: %s", " ".join(args))
+    subprocess.run(args, cwd=project_root, check=True)
+
+
 @click.command()
 @click.option("--task", type=str, help="The task to run")
 @click.option("--solver", type=str, help="The solver to use")
@@ -78,6 +100,10 @@ def allocate_experiment_dir(base_dir: str, exp_name: str) -> Path:
 @click.option("--validation-positive-cap", type=click.IntRange(min=1), default=None, help="Maximum number of positive validation test cases.")
 @click.option("--validation-negative-cap", type=click.IntRange(min=1), default=None, help="Maximum number of negative validation test cases.")
 @click.option("--validation-sampling-seed", type=int, default=42, show_default=True, help="Base seed for deterministic validation sampling.")
+@click.option("--scorers", type=str, default=None, help="Explicit scorer configuration for post-run evaluation, e.g. postcondition or defects4j.")
+@click.option("--export-sample-results", is_flag=True, help="Export <run_dir>/sample_results.json after evaluation finishes.")
+@click.option("--sample-results-benchmark", type=click.Choice(["apps", "humaneval_plus", "defects4j"]), default=None, help="Benchmark label to use when exporting sample_results.json.")
+@click.option("--sample-results-variant", type=click.Choice(["mono", "topdown", "ts", "without_tc", "nl2_base", "nl2_simple"]), default=None, help="Variant label to use when exporting sample_results.json.")
 def main(
     task: str,
     solver: str,
@@ -103,7 +129,19 @@ def main(
     validation_positive_cap: Optional[int],
     validation_negative_cap: Optional[int],
     validation_sampling_seed: int,
+    scorers: Optional[str],
+    export_sample_results: bool,
+    sample_results_benchmark: Optional[str],
+    sample_results_variant: Optional[str],
 ):
+    if export_sample_results and (
+        sample_results_benchmark is None or sample_results_variant is None
+    ):
+        raise click.ClickException(
+            "--export-sample-results requires both "
+            "--sample-results-benchmark and --sample-results-variant."
+        )
+
     base_dir = base_dir or DEFAULT_BASE_DIRS.get(task, "inspect_logs")
     log_dir = allocate_experiment_dir(base_dir, exp_name)
     log_path = str(log_dir)
@@ -129,6 +167,7 @@ def main(
         validation_positive_cap: {validation_positive_cap}
         validation_negative_cap: {validation_negative_cap}
         validation_sampling_seed: {validation_sampling_seed}
+        scorers: {scorers}
         """
         )
     )
@@ -241,7 +280,24 @@ def main(
         "-s",
         str(Path(result_path).parent / "results.json"),
     ]
+    if scorers:
+        args.extend(["--scorers", scorers])
     execute(args, logger)
+
+    if export_sample_results:
+        run_dir = Path(result_path).parent
+        evaluation_result_dir = run_dir / "evaluation_result"
+        if not evaluation_result_dir.exists():
+            raise click.ClickException(
+                f"Cannot export sample_results.json because {evaluation_result_dir} "
+                "was not created."
+            )
+        export_sample_results_json(
+            run_dir=run_dir,
+            benchmark=sample_results_benchmark,
+            variant=sample_results_variant,
+            logger=logger,
+        )
 
 if __name__ == "__main__":
     main()  # type: ignore

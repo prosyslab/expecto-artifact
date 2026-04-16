@@ -63,6 +63,7 @@ def get_default_scorers(task: str) -> str:
 async def run_executor(
     log_path: str,
     save_file: str = "results.json",
+    scorers: Optional[str] = None,
     limit: Optional[int] = None,
     max_sandboxes: Optional[int] = None,
     rerun_from: Optional[str] = None,
@@ -93,7 +94,7 @@ async def run_executor(
     eval_spec = log_header.eval
     model = eval_spec.model
     task = eval_spec.task
-    scorers = get_default_scorers(task)
+    scorers = scorers or get_default_scorers(task)
     level = eval_spec.task_args.get("level", "unknown")
 
     console.print(
@@ -378,6 +379,15 @@ async def run_executor(
     help="Anchor file path used to derive the `evaluation_result/` output directory",
 )
 @click.option(
+    "--scorers",
+    type=str,
+    default=None,
+    help=(
+        "Explicit scorer configuration, e.g. `postcondition`, `defects4j`, "
+        "or a comma-separated scorer list. If omitted, uses the built-in task map."
+    ),
+)
+@click.option(
     "--limit",
     "-n",
     type=int,
@@ -421,6 +431,7 @@ def main(
     ctx,
     log_path,
     save_file,
+    scorers,
     limit,
     max_sandboxes,
     rerun_from,
@@ -435,15 +446,16 @@ def main(
     if not log_path:
         raise click.UsageError("`--log-path` is required when running evaluation.")
     if not Path(log_path).is_file():
-        raise click.UsageError(f"`--log-path` must point to an existing file: {log_path}")
+        raise click.UsageError(
+            f"`--log-path` must point to an existing file: {log_path}"
+        )
 
-    console.print(
-        Panel.fit("[bold blue]LLM Code Execution[/]", border_style="blue")
-    )
+    console.print(Panel.fit("[bold blue]LLM Code Execution[/]", border_style="blue"))
     asyncio.run(
         run_executor(
             log_path=log_path,
             save_file=save_file,
+            scorers=scorers,
             limit=limit,
             max_sandboxes=max_sandboxes,
             rerun_from=rerun_from,

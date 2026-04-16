@@ -187,6 +187,9 @@ inspect_logs/*
 # datasets
 *.json
 *.jsonl
+!datasets/examples/
+!datasets/examples/apps_hello_world.json
+!datasets/examples/defects4j_hello_world.jsonl
 
 # Cursor
 .cursor

@@ -1,0 +1,15 @@
+[
+  {
+    "problem_id": "hello_world_sum",
+    "difficulty": "introductory",
+    "entry_point": null,
+    "prompt": "Read two integers separated by whitespace and print their sum.",
+    "input_output": "{\"inputs\": [\"1 2\\n\", \"10 -3\\n\", \"0 0\\n\"], \"outputs\": [\"3\\n\", \"7\\n\", \"0\\n\"]}",
+    "mutated_input_output": "{\"inputs\": [\"1 2\\n\", \"10 -3\\n\", \"0 0\\n\"], \"outputs\": [\"4\\n\", \"8\\n\", \"1\\n\"]}",
+    "parser": "def parser(input: str, output: str) -> tuple[int, int, int]:\n    \"\"\"Convert raw stdin/stdout text into typed postcondition arguments.\"\"\"\n    a_str, b_str = input.strip().split()\n    return int(a_str), int(b_str), int(output.strip())",
+    "signature": "def postcondition(a: int, b: int, result: int):\n    pass",
+    "solutions": [],
+    "starter_code": "",
+    "url": null
+  }
+]

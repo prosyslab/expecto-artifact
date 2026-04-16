@@ -149,7 +149,8 @@ The `expecto-artifact` repository has the following directory structure:
 /workspace/expecto-artifact
 ├── README.md                          <- Top-level README (this file)
 ├── analyzer/                          <- Figure and table generation scripts
-├── datasets/                          <- HumanEval+, APPS, and Defects4J datasets
+├── datasets/                          <- HumanEval+, APPS, Defects4J, and benchmark extension examples
+│   └── examples/                      <- Minimal APPS-style and Java/Defects4J-style benchmark examples
 ├── expecto/                           <- Core Expecto implementation
 ├── nl-2-postcond/                     <- NL2Postcond baseline from FSE '24
 └── scripts/                           <- Scripts for running artifact experiments
@@ -471,31 +472,214 @@ Chart_6_workspace_objdump_d4j_full_fresh_chart_6_source_org_jfree_chart_util_Sha
 
 # 7. Adding a new benchmark
 
-This section explains the easiest way to add a new benchmark such as APPS or HumanEval+.
+This section gives two complete hello-world-sized examples you can copy from:
 
-## 7.1 Start from one complete example
+- `datasets/examples/apps_hello_world.json`: a minimal APPS-style task with a parser
+- `datasets/examples/defects4j_hello_world.jsonl`: a minimal Java / Defects4J-style task
 
-Below is a minimal example of a new benchmark item named `my_benchmark`.
+## 7.1 APPS-style hello world with a parser
+
+Start from `datasets/examples/apps_hello_world.json`.
+It contains a single task named `hello_world_sum`:
 
 ```json
-{
-  "problem_id": "1",
-  "prompt": "Write a function that returns True when a list of integers is sorted in non-decreasing order, and False otherwise.",
-  "input_output": "{\"inputs\": [[[1, 2, 2, 5]], [[3, 1, 4]], [[7]], [[0, 0, 0]], [[5, 4]]], \"outputs\": [true, false, true, true, false]}",
-  "mutated_input_output": "{\"inputs\": [[[1, 2, 2, 5]], [[3, 1, 4]], [[7]], [[0, 0, 0]], [[5, 4]]], \"outputs\": [false, true, false, false, true]}",
-  "signature": "def postcondition(nums: list[int], result: bool):\n    pass"
-}
+[
+  {
+    "problem_id": "hello_world_sum",
+    "difficulty": "introductory",
+    "prompt": "Read two integers separated by whitespace and print their sum.",
+    "input_output": "{\"inputs\": [\"1 2\\n\", \"10 -3\\n\", \"0 0\\n\"], \"outputs\": [\"3\\n\", \"7\\n\", \"0\\n\"]}",
+    "mutated_input_output": "{\"inputs\": [\"1 2\\n\", \"10 -3\\n\", \"0 0\\n\"], \"outputs\": [\"4\\n\", \"8\\n\", \"1\\n\"]}",
+    "parser": "def parser(input: str, output: str) -> tuple[int, int, int]:\n    a_str, b_str = input.strip().split()\n    return int(a_str), int(b_str), int(output.strip())",
+    "signature": "def postcondition(a: int, b: int, result: int):\n    pass"
+  }
+]
 ```
 
 This example works as follows:
 
-- `problem_id = "1"` becomes the sample identifier. The loader also uses it when filtering samples and selecting validation test cases.
+- `problem_id = "hello_world_sum"` becomes the sample identifier.
 - `prompt` is the natural-language task description shown to the model.
-- `input_output` stores correct input-output pairs. It is used to check completeness, so the generated specification should accept these examples.
-- `mutated_input_output` stores incorrect input-output pairs. It is used to check soundness, so the generated specification should reject them.
-- `signature` indicates that the specification is a `postcondition` function over `nums: list[int]` and `result: bool` using Python syntax. **Every parameter in this signature must have an explicit type annotation.**
+- `input_output` stores correct stdin/stdout examples. Expecto should accept these examples when checking completeness.
+- `mutated_input_output` stores incorrect stdin/stdout examples. Expecto should reject these examples when checking soundness.
+- `parser` converts raw stdin/stdout text into the typed arguments expected by `postcondition(...)`.
+- `signature` tells Expecto that the synthesized specification is over `a: int`, `b: int`, and `result: int`.
+- In this example, that means the parser must return values with types `(int, int, int)` in exactly that order.
 
-## 7.2 General rules for every item
+### What the parser is allowed and expected to do
+
+For APPS-style datasets, the parser is only a conversion layer from stored text examples to typed values.
+The parser in `apps_hello_world.json` is intentionally small because that is the right contract:
+
+- It reads the raw input string and raw output string from the dataset.
+- It converts them to the exact argument types declared in `signature`.
+- It returns a deterministic tuple whose order matches `postcondition(...)`.
+
+The mapping rule is positional.
+Expecto evaluates `parser(input, output)` and then passes the returned values to `postcondition(...)` in the same order as the parameters in `signature`.
+So the parser return type must match the `postcondition` argument types exactly.
+You should think of the parser as producing the full argument list for `postcondition(...)`.
+For the hello-world example:
+
+```python
+def postcondition(a: int, b: int, result: int):
+    pass
+
+def parser(input: str, output: str) -> tuple[int, int, int]:
+    a_str, b_str = input.strip().split()
+    return int(a_str), int(b_str), int(output.strip())
+```
+
+Here the parser return type is `tuple[int, int, int]` because `postcondition(...)` takes `(a: int, b: int, result: int)`.
+For `input = "1 2\n"` and `output = "3\n"`, Expecto does:
+
+```python
+parser("1 2\n", "3\n") == (1, 2, 3)
+postcondition(1, 2, 3)
+```
+
+The same rule applies in general:
+
+- `def postcondition(x: int, ok: bool): ...` means parser return type `tuple[int, bool]`
+- `def postcondition(nums: list[int], result: bool): ...` means parser return type `tuple[list[int], bool]`
+
+There is no name-based matching here.
+If the parser returns the wrong arity or incompatible types, evaluation will fail.
+Expecto may still apply small compatibility conversions after parsing, such as `bool -> int` or `int -> float`, when those are required by the annotated `signature` types.
+In practice, you should still write the parser so that its annotated return type already matches the `postcondition` parameter types directly, rather than relying on those conversions.
+
+The parser should not:
+
+- re-implement the task logic
+- decide whether an example is correct or incorrect
+- read external files, call network services, or depend on hidden state
+
+If the raw output format sometimes includes exceptional strings, the parser may normalize them into a sentinel value such as `-1` or `0`, as long as the returned type still matches `signature`.
+If your dataset already stores structured values, as HumanEval+ does, set `parser` to `null` instead of writing a dummy parser.
+
+### Minimal steps to run this as a new task
+
+1. Copy `expecto/src/tasks/apps.py` to `expecto/src/tasks/hello_world_apps.py`.
+2. Change `@task(name="apps")` to `@task(name="hello_world_apps")`.
+3. Change the dataset file from `apps.json` to `examples/apps_hello_world.json`.
+4. Register the new task in `expecto/src/tasks/__init__.py`.
+5. Run one sample with:
+
+```bash
+python3 scripts/executor.py \
+  --task hello_world_apps \
+  --solver tree_search \
+  --model openai/gpt-4.1-mini \
+  --base_dir /workspace/data/hello-world \
+  --exp_name hello-world-apps \
+  --sample-ids hello_world_sum \
+  --n_completions 1 \
+  --max_attempts 1 \
+  --use_test_cases \
+  --use_memo \
+  --scorers postcondition \
+  --export-sample-results \
+  --sample-results-benchmark apps \
+  --sample-results-variant topdown
+```
+
+If `/workspace/data/hello-world/hello-world-apps/` does not already exist, this command writes its outputs there.
+Because `hello_world_apps` is a new task name, pass `--scorers postcondition` explicitly instead of relying on the built-in default scorer map.
+The most important files are:
+
+- `/workspace/data/hello-world/hello-world-apps/evaluation_result/manifest.json`
+- `/workspace/data/hello-world/hello-world-apps/evaluation_result/samples/hello_world_sum.json`
+- `/workspace/data/hello-world/hello-world-apps/sample_results.json`
+
+If that directory already exists, `scripts/executor.py` creates a suffixed directory such as `/workspace/data/hello-world/hello-world-apps_1/` instead.
+
+## 7.2 Java hello world (Defects4J-style)
+
+Start from `datasets/examples/defects4j_hello_world.jsonl`.
+This file contains one Java method example:
+
+```java
+/**
+ * Returns a greeting for the supplied name.
+ *
+ * @param name the name to greet
+ * @return the greeting string
+ */
+public static String hello(final String name) {
+    return "Hello, " + name + "!";
+}
+```
+
+Unlike APPS, the Java benchmark does not use stdin/stdout strings plus a parser.
+Instead, each record contains:
+
+- `method_info`: the Java signature, Javadoc, code, and entry/exit schemas
+- `corrects`: serialized executions that should satisfy the specification
+- `incorrects`: serialized executions that should be rejected by the specification
+
+For this hello-world example, the important schema fields are:
+
+- `entry_schema.params = "record[name: string]"`
+- `entry_schema.self = "nonetype"`
+- `exit_schema.self = "nonetype"`
+- `exit_schema.ret = "string"`
+
+The corresponding serialized executions look like this conceptually:
+
+```json
+{
+  "entry": {
+    "params": {"name": "World"},
+    "self": null
+  },
+  "exit": {
+    "self": null,
+    "ret": "Hello, World!"
+  }
+}
+```
+
+Use this format when your Java benchmark is method-based rather than stdin/stdout-based.
+There is no `parser` field here because the dataset already stores serialized arguments, pre-state, post-state, and return values.
+In this hello-world example, `self` is always `null` because the method is `static`, so plain `nonetype` is enough. You only need `option[...]` when the schema genuinely needs an optional value.
+
+### Minimal steps to run this as a new Java task
+
+1. Copy `expecto/src/tasks/defects4j.py` to `expecto/src/tasks/hello_world_java.py`.
+2. Change `@task(name="defects4j")` to `@task(name="hello_world_java")`.
+3. Change the dataset file resolver so it reads `datasets/examples/defects4j_hello_world.jsonl`.
+4. Register the new task in `expecto/src/tasks/__init__.py`.
+5. Run one sample with:
+
+```bash
+python3 scripts/executor.py \
+  --task hello_world_java \
+  --solver defects4j_tree_search \
+  --model openai/gpt-4.1-mini \
+  --base_dir /workspace/data/hello-world \
+  --exp_name hello-world-java \
+  --sample-ids Hello_1_example_Hello_java_String_hello_String_name \
+  --n_completions 1 \
+  --max_attempts 1 \
+  --use_test_cases \
+  --use_memo \
+  --scorers defects4j \
+  --export-sample-results \
+  --sample-results-benchmark defects4j \
+  --sample-results-variant ts
+```
+
+If `/workspace/data/hello-world/hello-world-java/` does not already exist, this command writes its outputs there.
+Because `hello_world_java` is a new task name, pass `--scorers defects4j` explicitly instead of relying on the built-in default scorer map.
+The most important files are:
+
+- `/workspace/data/hello-world/hello-world-java/evaluation_result/manifest.json`
+- `/workspace/data/hello-world/hello-world-java/evaluation_result/samples/Hello_1_example_Hello_java_String_hello_String_name.json`
+- `/workspace/data/hello-world/hello-world-java/sample_results.json`
+
+If that directory already exists, `scripts/executor.py` creates a suffixed directory such as `/workspace/data/hello-world/hello-world-java_1/` instead.
+
+## 7.3 General rules for APPS/HumanEval+-style items
 
 If your new benchmark follows the same structure, each item should contain the following fields.
 
@@ -506,11 +690,11 @@ If your new benchmark follows the same structure, each item should contain the f
 | `input_output` | Yes | A string representation of an object that contains `inputs` and `outputs` for correct input-output pairs. `record_to_sample(...)` calls `json.loads(...)` on this string, pairs each input with the corresponding output, and stores the result in `metadata["test_list"]`. This list is used for completeness evaluation. A small subset also becomes `metadata["prompt_test_list"]` to guide generation. |
 | `mutated_input_output` | Yes | A string representation of an object that contains `inputs` and `outputs` for incorrect or bug-revealing input-output pairs. `record_to_sample(...)` calls `json.loads(...)` on this string, pairs each input with the corresponding output, and stores the result in `metadata["mutated_test_list"]`. This list is used for soundness evaluation. |
 | `signature` | Yes | Copied to `metadata["signature"]`. Every parameter must have an explicit type annotation. Write this signature using Python type syntax such as `list[int]`, `bool`, and `tuple[int, str]`. The existing internal converters then transform those Python type annotations into the specification type system used by Expecto, so you should reuse that path instead of writing Expecto-specific types directly in the dataset. |
-| `parser` | No | Copied to `metadata["parser"]`. This field is only needed when the stored input and output examples must be converted before they match the `signature`. APPS needs it because its examples are stored as standard input and output strings. HumanEval+ does not need it because its examples are already stored as structured values, so it uses `null`. |
+| `parser` | No | Copied to `metadata["parser"]`. This field is only needed when the stored input and output examples must be converted before they match the `signature`. APPS needs it because its examples are stored as standard input and output strings. HumanEval+ does not need it because its examples are already stored as structured values, so it uses `null`. When a parser is present, Expecto evaluates `parser(input, output)` and passes the returned values to `postcondition(...)` positionally, in `signature` order. Therefore, the parser return type should be the tuple of `postcondition` parameter types in that same order. See `datasets/examples/apps_hello_world.json` for a minimal parser. |
 
 If your benchmark needs extra metadata, you can add fields beyond those listed above. The fields listed here are the ones that must be handled by the current APPS- and HumanEval+-style loaders. Any other fields may be added freely for benchmark-specific use.
 
-## 7.3 Expected shape of the example fields
+## 7.4 Expected shape of the example fields
 
 The `input_output` and `mutated_input_output` fields are stored as strings. Each string must contain a JSON object with two arrays named `inputs` and `outputs`.
 
@@ -557,11 +741,14 @@ For example, if the signature is `def postcondition(nums: list[int], result: boo
 3. Convert the output string to a Boolean value.
 4. Return `(nums, result)`.
 
+The important rule is that the parser return type must match the `postcondition` parameter types.
+For this example, the expected parser return type is `tuple[list[int], bool]`, because `postcondition(...)` takes `nums: list[int]` and `result: bool`.
+
 The loader still stores `(input, output)` pairs in metadata, but later generation and evaluation steps call the parser to convert those raw strings into meaningful values. Pairs from `input_output` are used to check completeness, and pairs from `mutated_input_output` are used to check soundness.
 
 In both cases, the loader pairs `inputs[i]` with `outputs[i]`, so both arrays must have the same length.
 
-## 7.4 Type annotations in `signature`
+## 7.5 Type annotations in `signature`
 
 For `signature`, prefer ordinary Python type annotations. For example:
 
@@ -586,7 +773,104 @@ This project already contains converters that read these Python type annotations
 
 The relevant conversion logic is in `/workspace/expecto-artifact/expecto/src/utils/dsl.py`.
 
-## 7.5 Steps to add the benchmark
+## 7.6 General rules for Defects4J-style items
+
+Defects4J-style datasets are method-level Java datasets.
+Use this format when each item describes a Java method execution with explicit before-and-after state, rather than stdin/stdout examples.
+The default loader accepts either a JSONL file with one bug record per line or a JSON array of the same records.
+
+Each top-level bug record should contain the following fields.
+
+| Field | Required? | Where it is used |
+| --- | --- | --- |
+| `project` | Yes | Becomes part of every method sample ID and is copied into sample metadata. |
+| `bug_id` | Yes | Becomes part of every method sample ID and is copied into sample metadata. Store it as a string or a value that can be converted to a string. |
+| `method_dumps` | Yes | A list of method-level records. Each element becomes one benchmark sample. |
+
+Each `method_dumps` element should contain the following fields.
+
+| Field | Required? | Where it is used |
+| --- | --- | --- |
+| `method_info` | Yes | Describes the target Java method and the schemas used to interpret serialized executions. |
+| `corrects` | Yes | A mapping from test IDs to serialized executions that should satisfy the generated specification. These executions are used for completeness evaluation. |
+| `incorrects` | Yes | A mapping from test IDs to serialized executions that should be rejected by the generated specification. These executions are used for soundness evaluation. |
+
+The `method_info` object should contain the following fields.
+
+| Field | Required? | Where it is used |
+| --- | --- | --- |
+| `code` | Yes | The Java method source shown to the model when method code is included in the prompt. |
+| `file` | Yes | The source file path. Together with `signature`, it is used to build the stable method sample ID. |
+| `javadoc` | Yes | A structured Javadoc object shown to the model. The existing examples use `description`, `params`, `returns`, and `throws`. |
+| `signature` | Yes | The Java method signature shown to the model and used in the stable method sample ID. This is a Java signature such as `String hello(String name)`, not a Python `postcondition(...)` signature. |
+| `entry_schema` | Yes | A schema object with `params` and `self` DSL type strings describing the pre-state. |
+| `exit_schema` | Yes | A schema object with `self` and `ret` DSL type strings describing the post-state and return value. |
+
+The generated sample ID is derived from `project`, `bug_id`, `method_info.file`, and `method_info.signature`.
+The file path and signature are sanitized into an identifier, so an example such as `project = "Hello"`, `bug_id = "1"`, `file = "example/Hello.java"`, and `signature = "String hello(String name)"` becomes:
+
+```text
+Hello_1_example_Hello_java_String_hello_String_name
+```
+
+If two methods produce the same base ID inside the same bug record, the loader appends a numeric suffix such as `_2`.
+Use the generated IDs with `--sample-ids`.
+
+### Schemas and serialized executions
+
+Defects4J-style schemas use Expecto DSL type syntax directly.
+They do not use the Python type annotations from APPS/HumanEval+-style `signature` fields.
+
+Common schema types are:
+
+| Java / serialized concept | Schema type |
+| --- | --- |
+| integer value | `int` |
+| Boolean value | `bool` |
+| floating-point value | `real` |
+| string value | `string` |
+| no receiver or no return value | `nonetype` |
+| nullable value | `option[T]` |
+| array or list | `list[T]` |
+| set | `set[T]` |
+| fixed tuple | `tuple[T1, T2, ...]` |
+| map | `map[K, V]` |
+| object or parameter bundle | `record[field1: T1, field2: T2, ...]` |
+
+`entry_schema.params` should normally be a `record[...]` with one field for each Java parameter.
+The field names in that record must match the keys stored in each execution's `entry.params` object.
+For a static method, set `entry_schema.self = "nonetype"` and `exit_schema.self = "nonetype"`, and store `null` for both `entry.self` and `exit.self`.
+For an instance method, use `self` to store the receiver object before and after the call.
+For a `void` method, use `exit_schema.ret = "nonetype"` and store `null` for `exit.ret`.
+
+Each execution in `corrects` or `incorrects` must have this shape:
+
+```json
+{
+  "entry": {
+    "params": {"name": "World"},
+    "self": null
+  },
+  "exit": {
+    "self": null,
+    "ret": "Hello, World!"
+  }
+}
+```
+
+The values inside `entry` and `exit` must match `entry_schema` and `exit_schema`.
+For `option[T]`, store `null` when the value is absent; non-null values are wrapped as `some(...)` during DSL evaluation.
+Avoid relying on missing keys: provide every key described by the schema so the dataset is easy to inspect and failures are explicit.
+
+There is no `parser`, `input_output`, `mutated_input_output`, or Python `signature` field in Defects4J-style items.
+The dataset already stores serialized parameter values, receiver state, return values, and post-state.
+During evaluation, `corrects` must all be accepted for completeness to pass.
+For soundness, the current Defects4J scorer passes a sample when at least one execution in `incorrects` is rejected, so include incorrect executions that represent meaningful bug-revealing behavior.
+
+If your benchmark needs extra metadata, add it only after preserving the fields above.
+The built-in Defects4J loader ignores unknown fields; a custom task can copy extra fields into sample metadata if it needs them.
+
+## 7.7 Steps to add the benchmark
 
 1. Add a new dataset file such as `datasets/my_benchmark.json`.
 2. Create a new task file by copying `/workspace/expecto-artifact/expecto/src/tasks/apps.py` or `/workspace/expecto-artifact/expecto/src/tasks/humaneval_plus.py`.

@@ -451,27 +451,71 @@ def _load_humaneval_nl2_run_descriptions(
     return descriptions
 
 
+def _iter_defects4j_dataset_paths(run_dir: Path | None = None) -> Iterable[Path]:
+    seen: set[Path] = set()
+
+    if run_dir is not None:
+        manifest_path = run_dir / "evaluation_result" / "manifest.json"
+        if manifest_path.is_file():
+            try:
+                manifest = json.loads(manifest_path.read_text())
+            except json.JSONDecodeError:
+                manifest = {}
+
+            dataset = (
+                manifest.get("eval_spec", {}).get("dataset", {})
+                if isinstance(manifest, Mapping)
+                else {}
+            )
+            location = dataset.get("location") if isinstance(dataset, Mapping) else None
+            if isinstance(location, str) and location.strip():
+                candidate = Path(location)
+                if not candidate.is_absolute():
+                    candidate = project_root / candidate
+                resolved = candidate.resolve()
+                if candidate.is_file() and resolved not in seen:
+                    seen.add(resolved)
+                    yield candidate
+
+    default_path = project_root / "datasets" / "defects4j.jsonl"
+    resolved_default = default_path.resolve()
+    if default_path.is_file() and resolved_default not in seen:
+        yield default_path
+
+
+def _iter_defects4j_dataset_records(dataset_path: Path) -> Iterable[dict[str, Any]]:
+    if dataset_path.suffix == ".jsonl":
+        with dataset_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                bug = json.loads(stripped)
+                if isinstance(bug, dict):
+                    yield cast(dict[str, Any], bug)
+        return
+
+    yield from _iter_json_array_records(dataset_path)
+
+
 def _load_defects4j_dataset_descriptions(
     sample_ids: Iterable[str],
+    *,
+    run_dir: Path | None = None,
 ) -> dict[str, str]:
     remaining = {str(sample_id) for sample_id in sample_ids if str(sample_id).strip()}
     if not remaining:
         return {}
 
     descriptions: dict[str, str] = {}
-    dataset_path = project_root / "datasets" / "defects4j.jsonl"
-    ids_count: dict[str, int] = {}
-    with dataset_path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            bug = json.loads(stripped)
+    for dataset_path in _iter_defects4j_dataset_paths(run_dir):
+        for bug in _iter_defects4j_dataset_records(dataset_path):
             if not isinstance(bug, dict):
                 continue
 
             project = str(bug.get("project", ""))
             bug_id = str(bug.get("bug_id", ""))
+            ids_count: dict[str, int] = {}
             for method_dump in bug.get("method_dumps", []):
                 if not isinstance(method_dump, dict):
                     continue
@@ -532,7 +576,9 @@ def _attach_nl_descriptions(
             still_missing = [sample_id for sample_id in missing_ids if sample_id not in descriptions]
         else:
             still_missing = missing_ids
-        descriptions.update(_load_defects4j_dataset_descriptions(still_missing))
+        descriptions.update(
+            _load_defects4j_dataset_descriptions(still_missing, run_dir=run_dir)
+        )
 
     for row in rows:
         if row.get("nl_description"):
